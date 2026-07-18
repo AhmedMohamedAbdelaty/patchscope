@@ -145,6 +145,12 @@ what changed, where should I start, and what have I already checked?
 32. Explicit reduced motion suppresses non-essential animation and transition.
     The operating-system reduced-motion preference is respected even when the
     browser-local setting remains on system.
+33. The opening screen explains the Open, Review, and Finish loop before asking
+    for input. Public URL, pasted diff, and uploaded file modes expose one
+    primary action each and state their privacy boundary beside the input.
+34. The review surface visually separates orientation, current-step guidance,
+    view controls, optional review tools, exports, and workflow actions. Every
+    capability remains keyboard reachable and available at 320 CSS pixels.
 
 ## Architecture decisions
 

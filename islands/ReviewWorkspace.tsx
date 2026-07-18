@@ -830,7 +830,36 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
           <Logo />
           <span>Patchscope</span>
         </a>
-        <p class="masthead-purpose">Review the change. Keep your place.</p>
+        <nav class="shell-stages" aria-label="Review workflow">
+          <span
+            data-state={review ? "complete" : "current"}
+            aria-current={review ? undefined : "step"}
+          >
+            Open
+          </span>
+          <i aria-hidden="true" />
+          <span
+            data-state={review
+              ? reviewedCount === review.files.length ? "complete" : "current"
+              : "upcoming"}
+            aria-current={review && reviewedCount !== review.files.length
+              ? "step"
+              : undefined}
+          >
+            Review
+          </span>
+          <i aria-hidden="true" />
+          <span
+            data-state={review && reviewedCount === review.files.length
+              ? "current"
+              : "upcoming"}
+            aria-current={review && reviewedCount === review.files.length
+              ? "step"
+              : undefined}
+          >
+            Finish
+          </span>
+        </nav>
         <div class="masthead-actions">
           <DisplayControl
             theme={theme}
@@ -845,11 +874,18 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
             onMotion={setMotion}
           />
           <details class="help-menu">
-            <summary aria-label="Keyboard help">
+            <summary aria-label="Help and keyboard shortcuts">
               <HelpIcon />
+              <span>Help</span>
             </summary>
             <div class="menu-panel">
-              <strong>Keyboard</strong>
+              <strong>Review in three steps</strong>
+              <p>
+                Open a change, follow the suggested file route, then export the
+                work you chose to publish.
+              </p>
+              <hr />
+              <strong>Keyboard shortcuts</strong>
               <span>
                 <kbd>j</kbd> / <kbd>k</kbd> change file
               </span>
@@ -951,6 +987,13 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
               findings={findings.filter((finding) => !finding.stale).length}
               onClose={closeReview}
             />
+            <ReviewGuide
+              reviewed={reviewedCount}
+              total={review.files.length}
+              selected={selected}
+              selectedReviewed={selected ? viewed.has(selected.id) : false}
+              findings={findings.filter((finding) => !finding.stale).length}
+            />
             <RevisionRail
               slices={revisions}
               current={revisionIndex}
@@ -1044,6 +1087,7 @@ function ImportDock({ loading, sampleDiff, onOpen, onProvider }: {
 }) {
   const [pasted, setPasted] = useState("");
   const [providerUrl, setProviderUrl] = useState("");
+  const [mode, setMode] = useState<"url" | "paste" | "file">("url");
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function upload(event: JSX.TargetedEvent<HTMLInputElement, Event>) {
@@ -1060,24 +1104,40 @@ function ImportDock({ loading, sampleDiff, onOpen, onProvider }: {
   return (
     <main id="workspace-main" class="empty-workspace">
       <section class="intro-copy" aria-labelledby="intro-title">
-        <p class="eyebrow">LOCAL-FIRST CHANGE REVIEW</p>
-        <h1 id="intro-title">A map for the patch in front of you.</h1>
+        <p class="eyebrow">A calmer code review workspace</p>
+        <h1 id="intro-title">Review the change without losing the thread.</h1>
         <p>
-          Open a diff, start with the consequential files, and leave with a
-          review ledger, not another tab you have to remember.
+          Patchscope turns a diff into a guided file route, remembers what you
+          checked, and keeps private notes beside the exact lines that prompted
+          them.
         </p>
-        <ul class="trust-list">
+        <ol class="welcome-steps" aria-label="How Patchscope works">
           <li>
-            <LockIcon />Pasted and uploaded patches stay in this browser.
+            <span>1</span>
+            <div>
+              <strong>Open a change</strong>
+              <small>Paste, upload, or use a public forge URL.</small>
+            </div>
           </li>
           <li>
-            <CompassIcon />Priority is explained navigation, never an automated
-            verdict.
+            <span>2</span>
+            <div>
+              <strong>Follow the route</strong>
+              <small>Start with the files most likely to matter.</small>
+            </div>
           </li>
           <li>
-            <KeyboardIcon />The full review loop works without a mouse.
+            <span>3</span>
+            <div>
+              <strong>Leave with a record</strong>
+              <small>Mark progress, add notes, and export deliberately.</small>
+            </div>
           </li>
-        </ul>
+        </ol>
+        <p class="privacy-note">
+          <LockIcon />{" "}
+          Local patches stay in this browser. Public URLs are read-only.
+        </p>
       </section>
 
       <section
@@ -1087,8 +1147,9 @@ function ImportDock({ loading, sampleDiff, onOpen, onProvider }: {
       >
         <div class="dock-heading">
           <div>
-            <p class="step-label">01 / OPEN A CHANGE</p>
-            <h2 id="import-title">Choose an input</h2>
+            <p class="step-label">Start here</p>
+            <h2 id="import-title">Open a change</h2>
+            <p>Choose the source you already have.</p>
           </div>
           <button
             class="text-button"
@@ -1101,21 +1162,46 @@ function ImportDock({ loading, sampleDiff, onOpen, onProvider }: {
                 "Session audit sample",
               )}
           >
-            Try the sample
+            See an example
+          </button>
+        </div>
+        <div class="import-modes" aria-label="Change source">
+          <button
+            type="button"
+            aria-pressed={mode === "url"}
+            onClick={() => setMode("url")}
+          >
+            Public URL
+          </button>
+          <button
+            type="button"
+            aria-pressed={mode === "paste"}
+            onClick={() => setMode("paste")}
+          >
+            Paste diff
+          </button>
+          <button
+            type="button"
+            aria-pressed={mode === "file"}
+            onClick={() => setMode("file")}
+          >
+            Upload file
           </button>
         </div>
 
-        <form
-          class="github-import"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void onProvider(providerUrl);
-          }}
-        >
-          <label for="github-url">
-            Public GitHub, GitLab, Codeberg, or Gitea change URL
-          </label>
-          <div class="input-action">
+        {mode === "url" && (
+          <form
+            class="github-import import-mode-panel"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void onProvider(providerUrl);
+            }}
+          >
+            <label for="github-url">Public change URL</label>
+            <p>
+              GitHub, GitLab.com, Codeberg, or Gitea.com commits, pull requests,
+              and comparisons.
+            </p>
             <input
               id="github-url"
               type="url"
@@ -1128,51 +1214,58 @@ function ImportDock({ loading, sampleDiff, onOpen, onProvider }: {
             <button class="primary-button" type="submit" disabled={loading}>
               {loading ? "Opening…" : "Open public change"}
             </button>
-          </div>
-        </form>
+          </form>
+        )}
 
-        <div class="divider">
-          <span>or keep it entirely local</span>
-        </div>
+        {mode === "paste" && (
+          <section class="import-mode-panel">
+            <label class="paste-label" for="raw-diff">Unified diff</label>
+            <p>The text is parsed locally and is not sent to Patchscope.</p>
+            <textarea
+              id="raw-diff"
+              value={pasted}
+              onInput={(event) => setPasted(event.currentTarget.value)}
+              placeholder={DIFF_PLACEHOLDER}
+              spellcheck={false}
+              disabled={loading}
+            />
+            <button
+              class="primary-button"
+              type="button"
+              disabled={loading || !pasted.trim()}
+              onClick={() =>
+                onOpen(pasted, { kind: "paste", label: "Pasted diff" })}
+            >
+              Review pasted diff
+            </button>
+          </section>
+        )}
 
-        <label class="paste-label" for="raw-diff">Paste a unified diff</label>
-        <textarea
-          id="raw-diff"
-          value={pasted}
-          onInput={(event) => setPasted(event.currentTarget.value)}
-          placeholder={DIFF_PLACEHOLDER}
-          spellcheck={false}
-          disabled={loading}
-        />
-        <div class="dock-actions">
-          <button
-            class="secondary-button"
-            type="button"
-            disabled={loading || !pasted.trim()}
-            onClick={() =>
-              onOpen(pasted, { kind: "paste", label: "Pasted diff" })}
-          >
-            Review pasted diff
-          </button>
-          <input
-            ref={fileRef}
-            class="visually-hidden"
-            type="file"
-            aria-label="Choose a patch or diff file"
-            accept=".patch,.diff,text/x-diff,text/x-patch"
-            onChange={upload}
-          />
-          <button
-            class="secondary-button"
-            type="button"
-            disabled={loading}
-            onClick={() => fileRef.current?.click()}
-          >
-            <UploadIcon />Choose .patch or .diff
-          </button>
-        </div>
+        {mode === "file" && (
+          <section class="import-mode-panel file-import-panel">
+            <UploadIcon />
+            <h3>Choose a patch from this device</h3>
+            <p>Accepted: .patch and .diff up to 5 MiB. The file stays local.</p>
+            <input
+              ref={fileRef}
+              class="visually-hidden"
+              type="file"
+              aria-label="Choose a patch or diff file"
+              accept=".patch,.diff,text/x-diff,text/x-patch"
+              onChange={upload}
+            />
+            <button
+              class="primary-button"
+              type="button"
+              disabled={loading}
+              onClick={() => fileRef.current?.click()}
+            >
+              Choose file
+            </button>
+          </section>
+        )}
         <p class="input-note">
-          Maximum 5 MiB · no account required · public reads only
+          No account required · no provider write access · 5 MiB maximum
         </p>
       </section>
     </main>
@@ -1205,8 +1298,8 @@ function ReviewHeader(
           <p class="source-label">
             {review.source.kind === "github" ||
                 review.source.kind === "provider"
-              ? "PUBLIC CHANGE"
-              : "LOCAL CHANGE"}
+              ? "Public change"
+              : "Local change"}
           </p>
           <h1>{review.title}</h1>
         </div>
@@ -1233,10 +1326,56 @@ function ReviewHeader(
         </div>
       </dl>
       <div class="progress-block">
-        <span>{progress}% complete</span>
+        <span>{progress}% reviewed</span>
         <progress max="100" value={progress}>{progress}%</progress>
       </div>
     </header>
+  );
+}
+
+function ReviewGuide(
+  { reviewed, total, selected, selectedReviewed, findings }: {
+    reviewed: number;
+    total: number;
+    selected?: DiffFile;
+    selectedReviewed: boolean;
+    findings: number;
+  },
+) {
+  const complete = total > 0 && reviewed === total;
+  const title = complete
+    ? "The file pass is complete"
+    : selectedReviewed
+    ? "Move to the next unchecked file"
+    : "Review the selected file";
+  const body = complete
+    ? `You checked all ${total} files. Open Export to copy the review ledger or publish selected findings.`
+    : selectedReviewed
+    ? "This file is recorded as reviewed. Continue through the suggested route or revisit any file from the sidebar."
+    : `Read ${
+      selected?.path ?? "the highlighted file"
+    }, click a changed line to leave a private note, then mark the file reviewed.`;
+  return (
+    <aside class="review-guide" aria-label="Current review step">
+      <div class="guide-position" aria-hidden="true">
+        {complete ? "3" : "2"}
+      </div>
+      <div>
+        <span>{complete ? "Finish" : "Current step"}</span>
+        <strong>{title}</strong>
+        <p>{body}</p>
+      </div>
+      <dl>
+        <div>
+          <dt>Progress</dt>
+          <dd>{reviewed}/{total} files</dd>
+        </div>
+        <div>
+          <dt>Notes</dt>
+          <dd>{findings}</dd>
+        </div>
+      </dl>
+    </aside>
   );
 }
 
@@ -1329,7 +1468,7 @@ function CommandPalette(props: {
     >
       <header>
         <div>
-          <span class="eyebrow">REVIEW OS</span>
+          <span class="eyebrow">All review actions</span>
           <h2 id="command-title">Command palette</h2>
         </div>
         <button
@@ -1448,7 +1587,7 @@ function RevisionRail(props: {
   return (
     <section class="revision-rail" aria-label="Revision stack">
       <div class="revision-track">
-        <span class="eyebrow">DELTA TIME MACHINE</span>
+        <span class="eyebrow">Revisions</span>
         <ol>
           {props.slices.map((item, index) => (
             <li key={item.document.id}>
@@ -1521,7 +1660,7 @@ function RevisionRail(props: {
           }
         }}
       >
-        <summary>Add revision</summary>
+        <summary>Compare another revision</summary>
         <div class="revision-importer">
           <form
             onSubmit={(event) => {
@@ -1755,8 +1894,8 @@ function ChangeAtlas(props: {
     <section class="change-atlas" aria-labelledby="atlas-title">
       <div class="atlas-heading">
         <div>
-          <span class="eyebrow">SUGGESTED ROUTE</span>
-          <h2 id="atlas-title">Change Atlas</h2>
+          <span class="eyebrow">Orientation</span>
+          <h2 id="atlas-title">Suggested route</h2>
         </div>
         <label>
           <span class="visually-hidden">Review lens</span>
@@ -1781,8 +1920,8 @@ function ChangeAtlas(props: {
           >
             <span class="atlas-step">00</span>
             <span>
-              <strong>All files</strong>
-              <small>Full change</small>
+              <strong>Full change</strong>
+              <small>All files</small>
             </span>
           </button>
         </li>
@@ -1810,7 +1949,7 @@ function ChangeAtlas(props: {
       </ol>
       <p class="atlas-explanation" aria-live="polite">
         {selected?.description ??
-          "A path-based starting point, not a dependency graph."}
+          "Start here, then work down the file list. The route is path-based guidance, not a verdict."}
       </p>
     </section>
   );
@@ -1887,131 +2026,148 @@ function FileToolbar(props: {
         </details>
       </div>
       <div class="tool-row">
-        <label class="search-field code-search">
-          <SearchIcon />
-          <span class="visually-hidden">Search selected file</span>
-          <input
-            ref={props.searchRef}
-            type="search"
-            value={props.query}
-            onInput={(event) => props.onQuery(event.currentTarget.value)}
-            placeholder="Search this file  /"
-          />
-        </label>
-        <div class="segmented" aria-label="Diff view">
+        <div class="tool-row-start">
+          <label class="search-field code-search">
+            <SearchIcon />
+            <span class="visually-hidden">Search selected file</span>
+            <input
+              ref={props.searchRef}
+              type="search"
+              value={props.query}
+              onInput={(event) => props.onQuery(event.currentTarget.value)}
+              placeholder="Search this file"
+            />
+          </label>
+          <details class="view-menu">
+            <summary>View</summary>
+            <div class="menu-panel">
+              <strong>Diff layout</strong>
+              <div class="segmented" aria-label="Diff view">
+                <button
+                  type="button"
+                  aria-pressed={props.viewStyle === "unified"}
+                  onClick={() => props.onViewStyle("unified")}
+                >
+                  Unified
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={props.viewStyle === "split"}
+                  onClick={() => props.onViewStyle("split")}
+                >
+                  Split
+                </button>
+              </div>
+              <label class="check-row">
+                <input
+                  type="checkbox"
+                  checked={props.wrap}
+                  onChange={() => props.onWrap(!props.wrap)}
+                />
+                <span>Wrap long lines</span>
+              </label>
+            </div>
+          </details>
+          <details class="tools-menu">
+            <summary>Review tools</summary>
+            <div class="menu-panel">
+              <button type="button" onClick={props.onEvidence}>
+                <span>
+                  <strong>Evidence check</strong>
+                  <small>Ask a model with exact citations</small>
+                </span>
+                {props.evidenceClaims > 0 && <b>{props.evidenceClaims}</b>}
+              </button>
+              {props.editorLink && (
+                <a href={props.editorLink}>
+                  <strong>Open in editor</strong>
+                  <small>Use your configured workspace path</small>
+                </a>
+              )}
+              <button type="button" onClick={props.onTeam}>
+                <span>
+                  <strong>Team handoff</strong>
+                  <small>Publish an encrypted review packet</small>
+                </span>
+              </button>
+              <button
+                type="button"
+                aria-keyshortcuts="Control+K Meta+K"
+                onClick={props.onPalette}
+              >
+                <span>
+                  <strong>Command menu</strong>
+                  <small>All actions and editor setup</small>
+                </span>
+                <kbd>⌘K</kbd>
+              </button>
+            </div>
+          </details>
+          <details class="more-menu export-menu">
+            <summary>Export</summary>
+            <div class="menu-panel align-right">
+              <button type="button" onClick={props.onCopy}>
+                Copy Markdown summary
+              </button>
+              <button type="button" onClick={props.onDownload}>
+                Download Markdown
+              </button>
+              <button type="button" onClick={props.onCopyIssue}>
+                Copy issue follow-up draft
+              </button>
+              <button type="button" onClick={props.onDownloadMemo}>
+                Download team review memo
+              </button>
+              <button type="button" onClick={props.onDownloadCapsule}>
+                Download review capsule
+              </button>
+              <input
+                ref={props.capsuleRef}
+                class="visually-hidden"
+                type="file"
+                accept=".json,application/json"
+                aria-label="Choose a Patchscope review capsule"
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0];
+                  if (file) void props.onImportCapsule(file);
+                  event.currentTarget.value = "";
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => props.capsuleRef.current?.click()}
+              >
+                Restore review capsule
+              </button>
+              <button type="button" onClick={props.onReset}>
+                Clear review progress
+              </button>
+              <small>
+                {props.findings}{" "}
+                private finding{props.findings === 1 ? "" : "s"}
+              </small>
+            </div>
+          </details>
+        </div>
+        <div class="workflow-actions">
           <button
+            class="review-button"
+            data-reviewed={props.reviewed}
             type="button"
-            aria-pressed={props.viewStyle === "unified"}
-            onClick={() => props.onViewStyle("unified")}
+            onClick={props.onViewed}
           >
-            Unified
+            {props.reviewed
+              ? (
+                <>
+                  <CheckIcon />Reviewed
+                </>
+              )
+              : "Mark reviewed"}
           </button>
-          <button
-            type="button"
-            aria-pressed={props.viewStyle === "split"}
-            onClick={() => props.onViewStyle("split")}
-          >
-            Split
+          <button class="next-button" type="button" onClick={props.onNext}>
+            Next file <ArrowIcon />
           </button>
         </div>
-        <button
-          class="tool-button"
-          type="button"
-          aria-pressed={props.wrap}
-          onClick={() => props.onWrap(!props.wrap)}
-        >
-          Wrap
-        </button>
-        <button
-          class="review-button"
-          data-reviewed={props.reviewed}
-          type="button"
-          onClick={props.onViewed}
-        >
-          {props.reviewed
-            ? (
-              <>
-                <CheckIcon />Reviewed
-              </>
-            )
-            : "Mark reviewed"}
-        </button>
-        <button class="next-button" type="button" onClick={props.onNext}>
-          Next unreviewed <ArrowIcon />
-        </button>
-        {props.editorLink && (
-          <a class="tool-button editor-link" href={props.editorLink}>
-            Open in editor
-          </a>
-        )}
-        <button
-          class="tool-button evidence-button"
-          type="button"
-          onClick={props.onEvidence}
-        >
-          Evidence{props.evidenceClaims ? ` · ${props.evidenceClaims}` : ""}
-        </button>
-        <button
-          class="tool-button team-button"
-          type="button"
-          onClick={props.onTeam}
-        >
-          Team handoff
-        </button>
-        <button
-          class="tool-button command-button"
-          type="button"
-          aria-keyshortcuts="Control+K Meta+K"
-          onClick={props.onPalette}
-        >
-          Commands <kbd>⌘K</kbd>
-        </button>
-        <details class="more-menu">
-          <summary aria-label="Review actions">
-            <MoreIcon />
-          </summary>
-          <div class="menu-panel align-right">
-            <button type="button" onClick={props.onCopy}>
-              Copy Markdown summary
-            </button>
-            <button type="button" onClick={props.onDownload}>
-              Download Markdown
-            </button>
-            <button type="button" onClick={props.onCopyIssue}>
-              Copy issue follow-up draft
-            </button>
-            <button type="button" onClick={props.onDownloadMemo}>
-              Download team review memo
-            </button>
-            <button type="button" onClick={props.onDownloadCapsule}>
-              Download review capsule
-            </button>
-            <input
-              ref={props.capsuleRef}
-              class="visually-hidden"
-              type="file"
-              accept=".json,application/json"
-              aria-label="Choose a Patchscope review capsule"
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                if (file) void props.onImportCapsule(file);
-                event.currentTarget.value = "";
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => props.capsuleRef.current?.click()}
-            >
-              Restore review capsule
-            </button>
-            <button type="button" onClick={props.onReset}>
-              Clear review progress
-            </button>
-            <small>
-              {props.findings} private finding{props.findings === 1 ? "" : "s"}
-            </small>
-          </div>
-        </details>
       </div>
     </header>
   );
@@ -2661,74 +2817,71 @@ function DisplayControl(props: {
       </summary>
       <div class="display-panel">
         <header>
-          <strong>Display settings</strong>
-          <small>Stored only in this browser</small>
+          <div>
+            <strong>Appearance</strong>
+            <small>Saved in this browser</small>
+          </div>
         </header>
-        <fieldset class="theme-choices">
-          <legend>Theme</legend>
-          {THEME_OPTIONS.map((option) => (
-            <label key={option.value} data-theme-choice={option.value}>
-              <input
-                type="radio"
-                name="display-theme"
-                value={option.value}
-                checked={props.theme === option.value}
-                onChange={() =>
-                  props.onTheme(option.value)}
-              />
-              <i aria-hidden="true">
-                <span />
-                <span />
-                <span />
-              </i>
-              {option.label}
-            </label>
-          ))}
-        </fieldset>
-        <DisplayRadioGroup
-          label="Density"
-          name="display-density"
-          value={props.density}
-          options={[
-            ["comfortable", "Comfortable"],
-            ["compact", "Compact"],
-          ]}
-          onChange={(value) => props.onDensity(value as Density)}
-        />
-        <DisplayRadioGroup
-          label="Text size"
-          name="display-type-scale"
-          value={props.typeScale}
-          options={[["small", "Small"], ["standard", "Standard"], [
-            "large",
-            "Large",
-          ]]}
-          onChange={(value) => props.onTypeScale(value as TypeScale)}
-        />
-        <DisplayRadioGroup
-          label="Code face"
-          name="display-code-font"
-          value={props.codeFont}
-          options={[["default", "Plex-style"], ["system", "System mono"], [
-            "sans",
-            "Sans",
-          ]]}
-          onChange={(value) => props.onCodeFont(value as CodeFont)}
-        />
-        <label class="motion-choice">
-          <input
-            type="checkbox"
-            checked={props.motion === "reduced"}
+        <label class="theme-select">
+          <span>Theme</span>
+          <select
+            value={props.theme}
             onChange={(event) =>
-              props.onMotion(
-                event.currentTarget.checked ? "reduced" : "system",
-              )}
-          />
-          <span>
-            <strong>Reduce motion</strong>
-            <small>System preference is always respected.</small>
-          </span>
+              props.onTheme(event.currentTarget.value as Theme)}
+          >
+            {THEME_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </label>
+        <details class="display-advanced">
+          <summary>Reading preferences</summary>
+          <div>
+            <DisplayRadioGroup
+              label="Density"
+              name="display-density"
+              value={props.density}
+              options={[["comfortable", "Comfortable"], ["compact", "Compact"]]}
+              onChange={(value) => props.onDensity(value as Density)}
+            />
+            <DisplayRadioGroup
+              label="Text size"
+              name="display-type-scale"
+              value={props.typeScale}
+              options={[["small", "Small"], ["standard", "Standard"], [
+                "large",
+                "Large",
+              ]]}
+              onChange={(value) => props.onTypeScale(value as TypeScale)}
+            />
+            <DisplayRadioGroup
+              label="Code face"
+              name="display-code-font"
+              value={props.codeFont}
+              options={[["default", "Plex"], ["system", "System mono"], [
+                "sans",
+                "Sans",
+              ]]}
+              onChange={(value) => props.onCodeFont(value as CodeFont)}
+            />
+            <label class="motion-choice">
+              <input
+                type="checkbox"
+                checked={props.motion === "reduced"}
+                onChange={(event) =>
+                  props.onMotion(
+                    event.currentTarget.checked ? "reduced" : "system",
+                  )}
+              />
+              <span>
+                <strong>Reduce motion</strong>
+                <small>System preference is always respected.</small>
+              </span>
+            </label>
+          </div>
+        </details>
       </div>
     </details>
   );
@@ -3164,18 +3317,6 @@ const LockIcon = () => (
     <path d="M8 10V7a4 4 0 0 1 8 0v3" />
   </Icon>
 );
-const CompassIcon = () => (
-  <Icon>
-    <circle cx="12" cy="12" r="9" />
-    <path d="m15 9-2 4-4 2 2-4z" />
-  </Icon>
-);
-const KeyboardIcon = () => (
-  <Icon>
-    <rect x="3" y="6" width="18" height="12" rx="1" />
-    <path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10" />
-  </Icon>
-);
 const UploadIcon = () => (
   <Icon>
     <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v5h14v-5" />
@@ -3205,13 +3346,6 @@ const CheckIcon = () => (
 const ArrowIcon = () => (
   <Icon size={15}>
     <path d="M5 12h14m-5-5 5 5-5 5" />
-  </Icon>
-);
-const MoreIcon = () => (
-  <Icon>
-    <circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" />
-    <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
-    <circle cx="19" cy="12" r="1" fill="currentColor" stroke="none" />
   </Icon>
 );
 const ExpandIcon = () => (

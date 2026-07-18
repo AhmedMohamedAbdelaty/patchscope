@@ -111,8 +111,8 @@ export function EvidenceLab(props: Props) {
     >
       <header>
         <div>
-          <span class="eyebrow">OPT-IN EVIDENCE</span>
-          <h2 id="evidence-title">Interrogate one file, not the repository.</h2>
+          <span class="eyebrow">AI evidence check</span>
+          <h2 id="evidence-title">Check this file with cited evidence.</h2>
         </div>
         <button
           type="button"

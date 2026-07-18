@@ -5,6 +5,11 @@ files with explained heuristics, turns them into a suggested review route,
 tracks progress and private line findings locally, and exports a Markdown
 ledger.
 
+The interface follows one visible loop: open a change, review the suggested
+route, then finish with an explicit export. Public URLs, pasted diffs, and local
+files have separate input modes; secondary capabilities stay grouped under
+Review tools and Export so the current review action remains clear.
+
 Live at
 [patchscope.ahmedmohamedabdelaty.deno.net](https://patchscope.ahmedmohamedabdelaty.deno.net).
 

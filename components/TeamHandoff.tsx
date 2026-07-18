@@ -150,8 +150,10 @@ export function TeamHandoff(props: Props) {
     >
       <header>
         <div>
-          <span class="eyebrow">PORTABLE TEAM REVIEW</span>
-          <h2 id="team-title">Publish a handoff, not your private notebook.</h2>
+          <span class="eyebrow">Encrypted team handoff</span>
+          <h2 id="team-title">
+            Share selected findings without sharing the patch.
+          </h2>
         </div>
         <button
           type="button"

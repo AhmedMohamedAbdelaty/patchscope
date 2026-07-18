@@ -1,5 +1,23 @@
 # Implementation notes
 
+## Interface hierarchy refresh
+
+- Goal: make the full product explain itself without removing advanced review
+  capabilities.
+- Evidence: the prior desktop toolbar gave navigation, completion, AI, team,
+  editor, command, and export actions equal visual weight; at 320 px the
+  appearance panel obscured the review surface and primary actions wrapped into
+  an undifferentiated cluster.
+- Design decision: GitHub-compatible diff semantics, restrained product chrome,
+  IBM Plex typography, and a cool neutral palette with the action blue anchored
+  to the public-forge context. The visible workflow is Open, Review, Finish.
+- Success criteria: one primary action per input mode; contextual review
+  guidance; optional features grouped under Review tools and Export; all prior
+  notebook, revision, command, AI, and encrypted-handoff flows preserved; and no
+  horizontal page overflow at 320, 768, or 1440 CSS pixels.
+- Out of scope: new persistence, accounts, backend behavior, hosted presence,
+  and changing the Deno deployment architecture.
+
 ## Phase 7 gate
 
 - Goal: widen the visual system for long review sessions and varied access needs
