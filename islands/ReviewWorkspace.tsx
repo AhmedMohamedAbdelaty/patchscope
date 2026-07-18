@@ -7,6 +7,10 @@ import {
   saveReview,
 } from "../lib/client/review-store.ts";
 import {
+  buildEditorLink,
+  type EditorChannel,
+} from "../lib/client/editor-link.ts";
+import {
   type AtlasLayer,
   atlasLayerDetails,
   type AtlasLayerId,
@@ -15,7 +19,11 @@ import {
   isReviewLens,
   type ReviewLens,
 } from "../lib/diff/atlas.ts";
-import { exportReview } from "../lib/diff/export.ts";
+import {
+  exportIssueDraft,
+  exportReview,
+  exportReviewMemo,
+} from "../lib/diff/export.ts";
 import { parseDiff } from "../lib/diff/parse.ts";
 import { priorityLabel } from "../lib/diff/priority.ts";
 import type {
@@ -70,7 +78,7 @@ interface ImportErrorBody {
   error?: { message?: string };
 }
 
-interface GitHubBody {
+interface ProviderBody {
   diff: string;
   source: { label: string; webUrl: string };
 }
@@ -109,6 +117,9 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
   const [fileQuery, setFileQuery] = useState("");
   const [codeQuery, setCodeQuery] = useState("");
   const [theme, setTheme] = useState<Theme>("system");
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [workspaceRoot, setWorkspaceRoot] = useState("");
+  const [editorChannel, setEditorChannel] = useState<EditorChannel>("stable");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -151,12 +162,23 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
         viewStyle?: ViewStyle;
         wrap?: boolean;
         reviewLens?: ReviewLens;
+        workspaceRoot?: string;
+        editorChannel?: EditorChannel;
       };
       if (preferences.theme) setTheme(preferences.theme);
       if (preferences.viewStyle) setViewStyle(preferences.viewStyle);
       if (typeof preferences.wrap === "boolean") setWrap(preferences.wrap);
       if (isReviewLens(preferences.reviewLens)) {
         setReviewLens(preferences.reviewLens);
+      }
+      if (typeof preferences.workspaceRoot === "string") {
+        setWorkspaceRoot(preferences.workspaceRoot);
+      }
+      if (
+        preferences.editorChannel === "stable" ||
+        preferences.editorChannel === "insiders"
+      ) {
+        setEditorChannel(preferences.editorChannel);
       }
     } catch {
       localStorage.removeItem("patchscope:preferences");
@@ -167,9 +189,16 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem(
       "patchscope:preferences",
-      JSON.stringify({ theme, viewStyle, wrap, reviewLens }),
+      JSON.stringify({
+        theme,
+        viewStyle,
+        wrap,
+        reviewLens,
+        workspaceRoot,
+        editorChannel,
+      }),
     );
-  }, [theme, viewStyle, wrap, reviewLens]);
+  }, [theme, viewStyle, wrap, reviewLens, workspaceRoot, editorChannel]);
 
   useEffect(() => setActiveAnchor(undefined), [selectedId]);
 
@@ -188,6 +217,11 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPaletteOpen(true);
+        return;
+      }
       const target = event.target as HTMLElement | null;
       if (
         target?.matches(
@@ -210,11 +244,24 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
     return () => globalThis.removeEventListener("keydown", onKeyDown);
   }, [selected, visibleFiles]);
 
+  const editorLink = useMemo(() => {
+    if (!selected || !workspaceRoot.trim()) return undefined;
+    try {
+      return buildEditorLink(
+        editorChannel,
+        workspaceRoot,
+        selected.path,
+        firstFileLine(selected),
+      );
+    } catch {
+      return undefined;
+    }
+  }, [editorChannel, selected, workspaceRoot]);
+
   useEffect(() => {
-    const githubUrl = new URL(globalThis.location.href).searchParams.get(
-      "github",
-    );
-    if (githubUrl && !review && !loading) void importGitHub(githubUrl);
+    const parameters = new URL(globalThis.location.href).searchParams;
+    const providerUrl = parameters.get("change") ?? parameters.get("github");
+    if (providerUrl && !review && !loading) void importProvider(providerUrl);
   }, []);
 
   async function openDiff(raw: string, source: DiffSource, title?: string) {
@@ -241,7 +288,7 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
         null,
         "",
         source.url
-          ? `?github=${encodeURIComponent(source.url)}`
+          ? `?change=${encodeURIComponent(source.url)}`
           : location.pathname,
       );
       setNotice(
@@ -308,7 +355,7 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
         null,
         "",
         source.url
-          ? `?github=${encodeURIComponent(source.url)}`
+          ? `?change=${encodeURIComponent(source.url)}`
           : location.pathname,
       );
       setNotice(revisionNotice(transition.delta, carried.findings));
@@ -323,50 +370,50 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
     }
   }
 
-  async function importGitHub(value: string) {
+  async function importProvider(value: string) {
     setLoading(true);
     setError("");
     setNotice("");
     try {
       const response = await fetch(
-        `/api/github?url=${encodeURIComponent(value)}`,
+        `/api/change?url=${encodeURIComponent(value)}`,
       );
-      const body = await response.json() as GitHubBody & ImportErrorBody;
+      const body = await response.json() as ProviderBody & ImportErrorBody;
       if (!response.ok) {
-        throw new Error(body.error?.message ?? "GitHub import failed.");
+        throw new Error(body.error?.message ?? "Provider import failed.");
       }
       await openDiff(body.diff, {
-        kind: "github",
+        kind: "provider",
         label: body.source.label,
         url: body.source.webUrl,
       }, body.source.label);
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : "GitHub import failed.",
+        cause instanceof Error ? cause.message : "Provider import failed.",
       );
       setLoading(false);
     }
   }
 
-  async function addGitHubRevision(value: string) {
+  async function addProviderRevision(value: string) {
     setLoading(true);
     setError("");
     try {
       const response = await fetch(
-        `/api/github?url=${encodeURIComponent(value)}`,
+        `/api/change?url=${encodeURIComponent(value)}`,
       );
-      const body = await response.json() as GitHubBody & ImportErrorBody;
+      const body = await response.json() as ProviderBody & ImportErrorBody;
       if (!response.ok) {
-        throw new Error(body.error?.message ?? "GitHub import failed.");
+        throw new Error(body.error?.message ?? "Provider import failed.");
       }
       await addRevision(body.diff, {
-        kind: "github",
+        kind: "provider",
         label: body.source.label,
         url: body.source.webUrl,
       }, body.source.label);
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : "GitHub import failed.",
+        cause instanceof Error ? cause.message : "Provider import failed.",
       );
       setLoading(false);
     }
@@ -471,6 +518,23 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
     }
   }
 
+  async function copyIssueDraft() {
+    if (!review) return;
+    await copyText(
+      exportIssueDraft(review, findings),
+      "Issue draft copied. Review it before posting.",
+    );
+  }
+
+  async function copyText(contents: string, success: string) {
+    try {
+      await navigator.clipboard.writeText(contents);
+      setNotice(success);
+    } catch {
+      setError("Clipboard access failed. Use a download action instead.");
+    }
+  }
+
   function downloadSummary() {
     if (!review) return;
     downloadFile(
@@ -478,6 +542,16 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
       `${slug(review.title)}-review.md`,
       "text/markdown;charset=utf-8",
     );
+  }
+
+  function downloadMemo() {
+    if (!review) return;
+    downloadFile(
+      exportReviewMemo(review, viewed, findings),
+      `${slug(review.title)}-review-memo.md`,
+      "text/markdown;charset=utf-8",
+    );
+    setNotice("Review memo downloaded locally.");
   }
 
   function downloadCapsule() {
@@ -650,6 +724,23 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
           <button type="button" onClick={() => setError("")}>Dismiss</button>
         </div>
       )}
+      {review && paletteOpen && (
+        <CommandPalette
+          selected={selected}
+          reviewed={selected ? viewed.has(selected.id) : false}
+          editorLink={editorLink}
+          workspaceRoot={workspaceRoot}
+          editorChannel={editorChannel}
+          onWorkspaceRoot={setWorkspaceRoot}
+          onEditorChannel={setEditorChannel}
+          onClose={() => setPaletteOpen(false)}
+          onNext={nextUnreviewed}
+          onToggleReviewed={() => selected && toggleViewed(selected.id)}
+          onCopySummary={copySummary}
+          onCopyIssue={copyIssueDraft}
+          onDownloadMemo={downloadMemo}
+        />
+      )}
 
       {!review
         ? (
@@ -657,7 +748,7 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
             loading={loading}
             sampleDiff={sampleDiff}
             onOpen={openDiff}
-            onGitHub={importGitHub}
+            onProvider={importProvider}
           />
         )
         : (
@@ -674,7 +765,7 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
               loading={loading}
               onSelect={switchRevision}
               onAdd={addRevision}
-              onGitHub={addGitHubRevision}
+              onProvider={addProviderRevision}
               onError={setError}
             />
             <div class="review-grid">
@@ -713,13 +804,17 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
                       onViewed={() => toggleViewed(selected.id)}
                       onNext={nextUnreviewed}
                       onCopy={copySummary}
+                      onCopyIssue={copyIssueDraft}
                       onDownload={downloadSummary}
+                      onDownloadMemo={downloadMemo}
                       onReset={resetProgress}
                       findings={findings.filter((finding) => !finding.stale)
                         .length}
                       capsuleRef={capsuleRef}
                       onDownloadCapsule={downloadCapsule}
                       onImportCapsule={importCapsule}
+                      onPalette={() => setPaletteOpen(true)}
+                      editorLink={editorLink}
                     />
                     <DiffViewer
                       file={selected}
@@ -746,14 +841,14 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
   );
 }
 
-function ImportDock({ loading, sampleDiff, onOpen, onGitHub }: {
+function ImportDock({ loading, sampleDiff, onOpen, onProvider }: {
   loading: boolean;
   sampleDiff: string;
   onOpen: (raw: string, source: DiffSource, title?: string) => Promise<void>;
-  onGitHub: (url: string) => Promise<void>;
+  onProvider: (url: string) => Promise<void>;
 }) {
   const [pasted, setPasted] = useState("");
-  const [github, setGitHub] = useState("");
+  const [providerUrl, setProviderUrl] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function upload(event: JSX.TargetedEvent<HTMLInputElement, Event>) {
@@ -819,24 +914,24 @@ function ImportDock({ loading, sampleDiff, onOpen, onGitHub }: {
           class="github-import"
           onSubmit={(event) => {
             event.preventDefault();
-            void onGitHub(github);
+            void onProvider(providerUrl);
           }}
         >
           <label for="github-url">
-            Public GitHub commit, pull request, or compare URL
+            Public GitHub, GitLab, Codeberg, or Gitea change URL
           </label>
           <div class="input-action">
             <input
               id="github-url"
               type="url"
-              value={github}
-              onInput={(event) => setGitHub(event.currentTarget.value)}
+              value={providerUrl}
+              onInput={(event) => setProviderUrl(event.currentTarget.value)}
               placeholder="https://github.com/owner/repo/pull/123"
               required
               disabled={loading}
             />
             <button class="primary-button" type="submit" disabled={loading}>
-              {loading ? "Opening…" : "Open GitHub change"}
+              {loading ? "Opening…" : "Open public change"}
             </button>
           </div>
         </form>
@@ -882,7 +977,7 @@ function ImportDock({ loading, sampleDiff, onOpen, onGitHub }: {
           </button>
         </div>
         <p class="input-note">
-          Maximum 5 MiB · no account required · public GitHub reads only
+          Maximum 5 MiB · no account required · public reads only
         </p>
       </section>
     </main>
@@ -913,7 +1008,10 @@ function ReviewHeader(
         </button>
         <div>
           <p class="source-label">
-            {review.source.kind === "github" ? "GITHUB CHANGE" : "LOCAL CHANGE"}
+            {review.source.kind === "github" ||
+                review.source.kind === "provider"
+              ? "PUBLIC CHANGE"
+              : "LOCAL CHANGE"}
           </p>
           <h1>{review.title}</h1>
         </div>
@@ -947,16 +1045,177 @@ function ReviewHeader(
   );
 }
 
+function CommandPalette(props: {
+  selected?: DiffFile;
+  reviewed: boolean;
+  editorLink?: string;
+  workspaceRoot: string;
+  editorChannel: EditorChannel;
+  onWorkspaceRoot: (value: string) => void;
+  onEditorChannel: (value: EditorChannel) => void;
+  onClose: () => void;
+  onNext: () => void;
+  onToggleReviewed: () => void;
+  onCopySummary: () => void;
+  onCopyIssue: () => void;
+  onDownloadMemo: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    dialogRef.current?.showModal();
+    searchRef.current?.focus();
+  }, []);
+
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const actions = [
+    {
+      label: "Go to next unreviewed file",
+      hint: "review",
+      run: props.onNext,
+    },
+    {
+      label: props.reviewed
+        ? "Mark selected file unreviewed"
+        : "Mark selected file reviewed",
+      hint: "review",
+      run: props.onToggleReviewed,
+    },
+    {
+      label: "Copy Markdown review ledger",
+      hint: "export",
+      run: props.onCopySummary,
+    },
+    {
+      label: "Copy issue follow-up draft",
+      hint: "export",
+      run: props.onCopyIssue,
+    },
+    {
+      label: "Download team review memo",
+      hint: "export",
+      run: props.onDownloadMemo,
+    },
+  ].filter((action) =>
+    action.label.toLocaleLowerCase().includes(normalizedQuery)
+  );
+  const editorVisible = Boolean(
+    props.editorLink && props.selected &&
+      `open ${props.selected.path} in vs code`.toLocaleLowerCase().includes(
+        normalizedQuery,
+      ),
+  );
+
+  function run(action: () => void) {
+    props.onClose();
+    action();
+  }
+
+  return (
+    <dialog
+      ref={dialogRef}
+      class="command-palette"
+      aria-labelledby="command-title"
+      onClose={props.onClose}
+    >
+      <header>
+        <div>
+          <span class="eyebrow">REVIEW OS</span>
+          <h2 id="command-title">Command palette</h2>
+        </div>
+        <button
+          type="button"
+          onClick={props.onClose}
+          aria-label="Close command palette"
+        >
+          Esc
+        </button>
+      </header>
+      <label class="command-search">
+        <SearchIcon />
+        <span class="visually-hidden">Filter review commands</span>
+        <input
+          ref={searchRef}
+          type="search"
+          value={query}
+          onInput={(event) => setQuery(event.currentTarget.value)}
+          placeholder="Type a review action"
+        />
+      </label>
+      <div class="command-body">
+        <ol class="command-list">
+          {actions.map((action) => (
+            <li key={action.label}>
+              <button type="button" onClick={() => run(action.run)}>
+                <span>{action.label}</span>
+                <small>{action.hint}</small>
+              </button>
+            </li>
+          ))}
+          {editorVisible && props.editorLink && props.selected && (
+            <li>
+              <a href={props.editorLink} onClick={props.onClose}>
+                <span>Open {props.selected.path} in VS Code</span>
+                <small>local</small>
+              </a>
+            </li>
+          )}
+          {actions.length === 0 && !editorVisible && (
+            <li class="empty-command">No matching command.</li>
+          )}
+        </ol>
+        <section class="editor-setup" aria-labelledby="editor-setup-title">
+          <h3 id="editor-setup-title">Local editor link</h3>
+          <p>
+            Stored only in this browser. Patchscope cannot detect your checkout.
+          </p>
+          <label>
+            Workspace root
+            <input
+              type="text"
+              value={props.workspaceRoot}
+              onInput={(event) =>
+                props.onWorkspaceRoot(event.currentTarget.value)}
+              placeholder="/home/you/projects/app"
+              spellcheck={false}
+            />
+          </label>
+          <label>
+            VS Code channel
+            <select
+              value={props.editorChannel}
+              onChange={(event) =>
+                props.onEditorChannel(
+                  event.currentTarget.value as EditorChannel,
+                )}
+            >
+              <option value="stable">Stable</option>
+              <option value="insiders">Insiders</option>
+            </select>
+          </label>
+          {props.workspaceRoot && !props.editorLink && (
+            <p class="editor-error">
+              Use an absolute path without parent traversal.
+            </p>
+          )}
+        </section>
+      </div>
+    </dialog>
+  );
+}
+
 function RevisionRail(props: {
   slices: RevisionSlice[];
   current: number;
   loading: boolean;
   onSelect: (index: number) => void;
   onAdd: (raw: string, source: DiffSource, title?: string) => Promise<void>;
-  onGitHub: (url: string) => Promise<void>;
+  onProvider: (url: string) => Promise<void>;
   onError: (message: string) => void;
 }) {
-  const [github, setGithub] = useState("");
+  const [providerUrl, setProviderUrl] = useState("");
   const [pasted, setPasted] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const addRef = useRef<HTMLDetailsElement>(null);
@@ -1060,19 +1319,19 @@ function RevisionRail(props: {
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              if (github.trim()) void props.onGitHub(github.trim());
+              if (providerUrl.trim()) void props.onProvider(providerUrl.trim());
             }}
           >
-            <label for="revision-github">
-              GitHub commit, pull, or compare URL
+            <label for="revision-provider">
+              Public forge change URL
             </label>
             <div class="input-action">
               <input
-                id="revision-github"
+                id="revision-provider"
                 type="url"
-                value={github}
-                onInput={(event) => setGithub(event.currentTarget.value)}
-                placeholder="https://github.com/owner/repo/compare/base...head"
+                value={providerUrl}
+                onInput={(event) => setProviderUrl(event.currentTarget.value)}
+                placeholder="https://gitlab.com/group/repo/-/merge_requests/42"
                 disabled={props.loading}
                 required
               />
@@ -1363,12 +1622,16 @@ function FileToolbar(props: {
   onViewed: () => void;
   onNext: () => void;
   onCopy: () => void;
+  onCopyIssue: () => void;
   onDownload: () => void;
+  onDownloadMemo: () => void;
   onReset: () => void;
   findings: number;
   capsuleRef: { current: HTMLInputElement | null };
   onDownloadCapsule: () => void;
   onImportCapsule: (file: File) => Promise<void>;
+  onPalette: () => void;
+  editorLink?: string;
 }) {
   const classification = classifyFile(props.file);
   const route = atlasLayerDetails(classification.layer);
@@ -1466,6 +1729,19 @@ function FileToolbar(props: {
         <button class="next-button" type="button" onClick={props.onNext}>
           Next unreviewed <ArrowIcon />
         </button>
+        {props.editorLink && (
+          <a class="tool-button editor-link" href={props.editorLink}>
+            Open in editor
+          </a>
+        )}
+        <button
+          class="tool-button command-button"
+          type="button"
+          aria-keyshortcuts="Control+K Meta+K"
+          onClick={props.onPalette}
+        >
+          Commands <kbd>⌘K</kbd>
+        </button>
         <details class="more-menu">
           <summary aria-label="Review actions">
             <MoreIcon />
@@ -1476,6 +1752,12 @@ function FileToolbar(props: {
             </button>
             <button type="button" onClick={props.onDownload}>
               Download Markdown
+            </button>
+            <button type="button" onClick={props.onCopyIssue}>
+              Copy issue follow-up draft
+            </button>
+            <button type="button" onClick={props.onDownloadMemo}>
+              Download team review memo
             </button>
             <button type="button" onClick={props.onDownloadCapsule}>
               Download review capsule
@@ -2219,6 +2501,16 @@ function filterAndSort(
 
 function recommendedFile(files: DiffFile[]): DiffFile | undefined {
   return files.toSorted((a, b) => b.priority - a.priority)[0];
+}
+
+function firstFileLine(file: DiffFile): number {
+  for (const hunk of file.hunks) {
+    for (const line of hunk.lines) {
+      if (line.newLine) return line.newLine;
+      if (line.oldLine) return line.oldLine;
+    }
+  }
+  return 1;
 }
 
 function sliceFromSaved(

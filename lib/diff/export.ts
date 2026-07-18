@@ -11,9 +11,7 @@ export function exportReview(
   const remaining = document.files.filter((file) =>
     !viewedFileIds.has(file.id)
   );
-  const source = document.source.url
-    ? `[${escapeText(document.source.label)}](${document.source.url})`
-    : escapeText(document.source.label);
+  const source = sourceLink(document);
   const includedFindings = findings.filter((finding) => finding.included);
   const lines = [
     `# Review: ${escapeText(document.title)}`,
@@ -49,6 +47,58 @@ export function exportReview(
   return lines.join("\n");
 }
 
+export function exportIssueDraft(
+  document: DiffDocument,
+  findings: readonly ReviewFinding[] = [],
+): string {
+  const included = findings.filter((finding) => finding.included);
+  return [
+    `## Review follow-up: ${escapeText(document.title)}`,
+    "",
+    `Source: ${sourceLink(document)}`,
+    `Scope: ${document.stats.files} files, +${document.stats.additions} −${document.stats.deletions}`,
+    "",
+    "### Items to resolve",
+    "",
+    ...(included.length
+      ? included.map((finding) => `- [ ] ${formatFindingBody(finding)}`)
+      : ["- [ ] Add the concrete follow-up before creating the issue."]),
+    "",
+    "_Drafted locally in Patchscope. Review and edit before posting._",
+  ].join("\n");
+}
+
+export function exportReviewMemo(
+  document: DiffDocument,
+  viewedFileIds: ReadonlySet<string>,
+  findings: readonly ReviewFinding[] = [],
+): string {
+  const included = findings.filter((finding) => finding.included);
+  const stale = included.filter((finding) => finding.stale);
+  return [
+    `# Review memo: ${escapeText(document.title)}`,
+    "",
+    `Source: ${sourceLink(document)}`,
+    `Reviewed: ${viewedFileIds.size}/${document.files.length} files`,
+    `Change size: +${document.stats.additions} −${document.stats.deletions}`,
+    "",
+    "## Reviewer attention",
+    "",
+    ...(included.length
+      ? included.map(formatFinding)
+      : ["- No findings selected for sharing."]),
+    "",
+    "## Handoff state",
+    "",
+    `- ${document.files.length - viewedFileIds.size} files remain unreviewed.`,
+    `- ${stale.length} selected finding${
+      stale.length === 1 ? " is" : "s are"
+    } stale and need re-anchoring.`,
+    "",
+    "_Prepared locally by Patchscope; no provider comment or document was created._",
+  ].join("\n");
+}
+
 function formatFinding(finding: ReviewFinding): string {
   const kind = finding.kind[0].toUpperCase() + finding.kind.slice(1);
   const location = `${codeSpan(finding.anchor.filePath)} (${
@@ -61,6 +111,20 @@ function formatFinding(finding: ReviewFinding): string {
     }]**`
     : "";
   return `- **${kind}**${stale} — ${location}${body}`;
+}
+
+function sourceLink(document: DiffDocument): string {
+  return document.source.url
+    ? `[${escapeText(document.source.label)}](${document.source.url})`
+    : escapeText(document.source.label);
+}
+
+function formatFindingBody(finding: ReviewFinding): string {
+  const stale = finding.stale ? "[stale] " : "";
+  const body = finding.body.trim() || "Return to this line";
+  return `${stale}${escapeText(body)} — ${
+    codeSpan(finding.anchor.filePath)
+  }:${finding.anchor.line}`;
 }
 
 function escapeText(value: string): string {

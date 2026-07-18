@@ -1,6 +1,6 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { parseDiff } from "./parse.ts";
-import { exportReview } from "./export.ts";
+import { exportIssueDraft, exportReview, exportReviewMemo } from "./export.ts";
 import { SAMPLE_DIFF } from "../sample.ts";
 import type { ReviewFinding } from "../review/notebook.ts";
 
@@ -107,4 +107,29 @@ Deno.test("exportReview labels stale evidence instead of presenting a live ancho
 
   assertStringIncludes(markdown, "[stale: file removed]");
   assertStringIncludes(markdown, "`removed.ts` (new line 4)");
+});
+
+Deno.test("issue and memo exports remain local drafts with distinct purposes", async () => {
+  const document = await parseDiff(SAMPLE_DIFF, {
+    kind: "github",
+    label: "acme/app · PR #1",
+    url: "https://github.com/acme/app/pull/1",
+  });
+  const file = document.files[0];
+  const finding: ReviewFinding = {
+    id: "follow-up",
+    kind: "question",
+    anchor: { fileId: file.id, filePath: file.path, side: "new", line: 8 },
+    body: "Who owns the migration?",
+    included: true,
+    createdAt: "2026-07-18T12:00:00.000Z",
+    updatedAt: "2026-07-18T12:00:00.000Z",
+  };
+  const issue = exportIssueDraft(document, [finding]);
+  const memo = exportReviewMemo(document, new Set([file.id]), [finding]);
+
+  assertStringIncludes(issue, "- [ ] Who owns the migration?");
+  assertStringIncludes(issue, "Review and edit before posting");
+  assertStringIncludes(memo, "Reviewed: 1/4 files");
+  assertStringIncludes(memo, "no provider comment or document was created");
 });

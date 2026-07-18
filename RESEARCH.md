@@ -4,6 +4,26 @@ This is the evidence behind the roadmap, not a feature checklist. Sources were
 selected for repeated reviewer pain, established review products, and recent
 code-review research.
 
+## Phase 4 provider verification
+
+- [GitLab's current merge-request API](https://docs.gitlab.com/api/merge_requests/#show-merge-request-raw-diffs)
+  documents `/raw_diffs`, while its
+  [user documentation](https://docs.gitlab.com/user/project/merge_requests/changes/#download-merge-request-changes)
+  supports appending `.diff` to a merge-request URL. Patchscope uses the public
+  plain-diff route and retains GitLab's own diff limits.
+- [Gitea's API](https://docs.gitea.com/api/1.21/#tag/repository/operation/repoDownloadCommitDiffOrPatch)
+  documents `GET /repos/{owner}/{repo}/git/commits/{sha}.diff`. Live Codeberg
+  and Gitea.com requests returned unified text for that contract.
+- [Forgejo documents Codeberg](https://forgejo.org/docs/latest/user/first-repository/)
+  as a public Forgejo instance. Patchscope limits this first adapter to Codeberg
+  rather than resolving arbitrary instance hosts.
+- [VS Code documents](https://code.visualstudio.com/docs/configure/command-line#_opening-vs-code-with-urls)
+  the `vscode://file/{absolute path}:line:column` protocol used by the local
+  editor link.
+- A live Gitea.com pull `.diff` request redirected to login. Provider fetches
+  use manual redirect handling so credentials, cookies, and arbitrary redirect
+  destinations never enter the server import path.
+
 ## What reviewers repeatedly ask for
 
 - Large changes create an orientation and memory problem: reviewers lose track

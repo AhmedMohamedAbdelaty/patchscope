@@ -301,6 +301,156 @@ kbd {
   text-decoration: underline;
 }
 
+.command-palette {
+  width: min(760px, calc(100% - 28px));
+  max-height: min(680px, calc(100vh - 36px));
+  padding: 0;
+  border: 1px solid var(--ink);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 24px 70px color-mix(in srgb, var(--ink), transparent 72%);
+}
+
+.command-palette::backdrop {
+  background: color-mix(in srgb, var(--ink), transparent 55%);
+}
+
+.command-palette > header {
+  min-height: 66px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.command-palette h2,
+.command-palette h3 {
+  margin: 0;
+}
+
+.command-palette h2 {
+  font-size: 1rem;
+}
+
+.command-palette h3 {
+  font-size: 0.78rem;
+}
+
+.command-palette > header button {
+  min-width: 42px;
+  min-height: 32px;
+  border-color: var(--line-strong);
+  background: transparent;
+  color: var(--muted);
+  font: 0.66rem var(--code);
+}
+
+.command-search {
+  min-height: 51px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.command-search input {
+  width: 100%;
+  min-height: 49px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.92rem;
+  outline: 0;
+}
+
+.command-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  min-height: 290px;
+}
+
+.command-list {
+  margin: 0;
+  padding: 8px;
+  border-right: 1px solid var(--line-strong);
+  list-style: none;
+}
+
+.command-list button,
+.command-list a {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  text-decoration: none;
+}
+
+.command-list button:hover,
+.command-list button:focus-visible,
+.command-list a:hover,
+.command-list a:focus-visible {
+  border-color: var(--line-strong);
+  background: var(--surface-raised);
+}
+
+.command-list small {
+  color: var(--muted);
+  font: 0.6rem var(--code);
+  text-transform: uppercase;
+}
+
+.empty-command {
+  padding: 18px 10px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.editor-setup {
+  padding: 15px;
+  background: var(--surface-raised);
+}
+
+.editor-setup p {
+  margin: 5px 0 14px;
+  color: var(--muted);
+  font-size: 0.69rem;
+  line-height: 1.45;
+}
+
+.editor-setup label {
+  display: grid;
+  gap: 5px;
+  margin-top: 11px;
+  color: var(--muted);
+  font-size: 0.65rem;
+}
+
+.editor-setup input,
+.editor-setup select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  font: 0.7rem var(--code);
+}
+
+.editor-setup .editor-error {
+  margin-top: 10px;
+  color: var(--deletion);
+}
+
 .empty-workspace {
   width: min(1180px, calc(100% - 40px));
   min-height: calc(100vh - 56px);
@@ -486,6 +636,17 @@ kbd {
   justify-content: center;
   gap: 7px;
   background: var(--surface-raised);
+}
+
+.editor-link {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.command-button kbd {
+  margin-left: 4px;
+  color: var(--muted);
+  font-size: 0.6rem;
 }
 
 .input-note {
@@ -1845,6 +2006,29 @@ mark {
     padding: 10px 12px;
   }
 
+  .command-palette {
+    width: calc(100% - 18px);
+    max-height: calc(100vh - 18px);
+  }
+
+  .command-body {
+    grid-template-columns: 1fr;
+    overflow: auto;
+  }
+
+  .command-list {
+    border-right: 0;
+    border-bottom: 1px solid var(--line-strong);
+  }
+
+  .editor-setup {
+    padding-bottom: 20px;
+  }
+
+  .command-palette > header button {
+    min-height: 44px;
+  }
+
   .revision-rail {
     align-items: stretch;
     gap: 7px;
@@ -2017,6 +2201,10 @@ mark {
 }
 
 @media (max-width: 420px) {
+  .command-button kbd {
+    display: none;
+  }
+
   .file-row {
     grid-template-columns: 22px minmax(0, 1fr) auto 8px;
   }

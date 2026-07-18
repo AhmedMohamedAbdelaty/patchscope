@@ -1,6 +1,6 @@
 const GITHUB_HOST = "github.com";
 const API_ROOT = "https://api.github.com";
-const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
+import { readBoundedText, ResponseTooLargeError } from "./bounded-response.ts";
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 50;
 
@@ -196,9 +196,13 @@ export async function fetchGitHubDiff(
     );
   }
 
-  const declaredLength = Number(response.headers.get("content-length") ?? 0);
-  if (declaredLength > MAX_RESPONSE_BYTES) throw tooLarge();
-  const diff = await readBoundedText(response, MAX_RESPONSE_BYTES);
+  let diff: string;
+  try {
+    diff = await readBoundedText(response);
+  } catch (error) {
+    if (error instanceof ResponseTooLargeError) throw tooLarge();
+    throw error;
+  }
   if (!diff.trim()) {
     throw new GitHubImportError(
       "EMPTY_DIFF",
@@ -293,35 +297,4 @@ function putCache(key: string, entry: CacheEntry): void {
     if (!oldest) break;
     cache.delete(oldest);
   }
-}
-
-async function readBoundedText(
-  response: Response,
-  limit: number,
-): Promise<string> {
-  if (!response.body) return "";
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > limit) {
-        await reader.cancel();
-        throw tooLarge();
-      }
-      chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return new TextDecoder().decode(bytes);
 }

@@ -1,8 +1,9 @@
 # Patchscope
 
-Patchscope reviews Git patches and public GitHub changes. It orders files with
-explained heuristics, turns them into a suggested review route, tracks progress
-and private line findings locally, and exports a Markdown ledger.
+Patchscope reviews Git patches and supported public forge changes. It orders
+files with explained heuristics, turns them into a suggested review route,
+tracks progress and private line findings locally, and exports a Markdown
+ledger.
 
 Live at
 [patchscope.ahmedmohamedabdelaty.deno.net](https://patchscope.ahmedmohamedabdelaty.deno.net).
@@ -11,19 +12,22 @@ Live at
 
 - Paste a unified Git diff or upload a `.patch`/`.diff` file. Local input never
   leaves the browser.
-- Import public GitHub commits, pull requests, and compares. The server accepts
-  GitHub URLs only and keeps a short ETag cache.
+- Import public GitHub, GitLab.com, Codeberg, and Gitea.com changes. The server
+  accepts exact-host change URLs only and keeps a short ETag cache.
 - Use Change Atlas to move through contracts, data, behavior, interface, tests,
   delivery, and low-signal artifacts with general, security, or test-first
   ordering. Its path-based route is guidance, not a dependency graph.
 - Add private concerns, questions, notes, and bookmarks to diff lines. Choose
   which findings enter Markdown, or move review state in a metadata-only
   `.patchscope.json` capsule.
-- Add adjacent local or GitHub revisions to a temporary stack. Patchscope shows
-  the file delta, carries only identical-file progress, and keeps invalidated
-  findings visibly stale instead of guessing a nearby line.
+- Add adjacent local or public-forge revisions to a temporary stack. Patchscope
+  shows the file delta, carries only identical-file progress, and keeps
+  invalidated findings visibly stale instead of guessing a nearby line.
+- Press `Ctrl+K` or `Cmd+K` inside a review for the command palette. It can move
+  review state, copy an issue follow-up draft, download a team memo, and build a
+  VS Code link after you provide an absolute local workspace path.
 - Inputs are limited to 5 MiB, 2,000 files, and 100,000 review lines.
-- Private repositories, GitHub writes, accounts, AI review, and server-side
+- Private repositories, provider writes, accounts, AI review, and server-side
   patch storage are out of scope.
 
 ## Run locally
@@ -48,8 +52,11 @@ deno task check
 deno task build
 ```
 
-`/health` returns the active Deno Deploy revision. `/api/github` returns stable
-error codes, upstream retry timing when available, and `X-RateLimit-*` headers.
+`/health` returns the active Deno Deploy revision. `/api/change` accepts GitHub
+commit/PR/compare URLs, GitLab.com commit/MR/compare URLs, and Codeberg or
+Gitea.com commit/PR/compare URLs. It returns stable errors, upstream retry
+timing when available, and `X-RateLimit-*` headers. Redirects are never
+followed.
 
 ## Deploy
 
@@ -90,8 +97,8 @@ and the
 - `lib/client/` stores review progress in IndexedDB.
 - `lib/review/` validates portable, source-free review capsules and computes
   conservative transitions between revisions.
-- `lib/server/` validates GitHub URLs, bounds provider reads, caches responses,
-  and rate-limits imports.
+- `lib/server/` validates supported forge URLs, bounds provider reads, caches
+  responses, and rate-limits imports.
 - `islands/ReviewWorkspace.tsx` coordinates the browser review loop.
 - `routes/` contains the Fresh shell and HTTP boundaries.
 

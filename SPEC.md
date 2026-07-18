@@ -2,9 +2,9 @@
 
 ## Outcome
 
-Patchscope turns a patch, diff file, or public GitHub change URL into a focused
-review workspace. It helps a reviewer answer three questions quickly: what
-changed, where should I start, and what have I already checked?
+Patchscope turns a patch, diff file, or supported public forge URL into a
+focused review workspace. It helps a reviewer answer three questions quickly:
+what changed, where should I start, and what have I already checked?
 
 ## Product boundary
 
@@ -12,8 +12,8 @@ changed, where should I start, and what have I already checked?
 
 - Paste a Git unified diff.
 - Upload `.patch` or `.diff` files.
-- Import a public GitHub commit, pull request, or compare URL through a
-  server-side allowlisted adapter.
+- Import a public GitHub, GitLab.com, Codeberg, or Gitea.com change URL through
+  a server-side allowlisted adapter.
 - Browse files by path or review priority.
 - Follow a conservative suggested route through change-purpose layers, with
   general, security, and test-focused lenses.
@@ -28,19 +28,26 @@ changed, where should I start, and what have I already checked?
   Markdown exports.
 - Export and restore a versioned review capsule containing progress, anchors,
   and findings but no diff contents.
-- Add adjacent local or public GitHub revisions to an in-memory review stack,
-  inspect their file delta, and move through the stack one revision at a time.
+- Add adjacent local or supported public-forge revisions to an in-memory review
+  stack, inspect their file delta, and move through the stack one revision at a
+  time.
 - Carry reviewed state and active findings forward only when the normalized file
   diff is identical. Preserve findings from changed or removed files as visibly
   stale evidence without guessing a replacement line.
+- Import public GitLab.com, Codeberg, and Gitea.com change URLs through the same
+  read-only, bounded server contract. Never follow provider redirects or fetch a
+  user-supplied hostname.
+- Open an explicitly configured local workspace path in a supported editor,
+  invoke core review actions from a keyboard command palette, and copy or
+  download issue/document drafts without posting them.
 - Explain every priority signal; never present heuristics as a security verdict.
 - Work with keyboard, touch, reduced motion, zoom, and narrow screens.
 
 ### Excluded
 
-- GitHub write access, private repositories, accounts, comments posted to a
-  provider, arbitrary URL fetching, AI review, server-side patch persistence, or
-  persistence of a revision stack across reloads.
+- Provider writes, private repositories, accounts, comments posted to a
+  provider, arbitrary forge hosts or URLs, AI review, server-side patch
+  persistence, or persistence of a revision stack across reloads.
 - Claims that a change is safe, correct, or vulnerable.
 - Claims that path-based layers represent runtime or dependency relationships.
 
@@ -48,8 +55,8 @@ changed, where should I start, and what have I already checked?
 
 1. A valid pasted or uploaded diff opens without a network request and shows
    accurate file and line counts.
-2. Public GitHub commit, pull request, and compare URLs are normalized and
-   fetched only from GitHub's API with bounded response size and stable errors.
+2. Public forge change URLs are normalized, dispatched only to exact-host
+   adapters, and fetched with bounded response size and stable errors.
 3. The file list exposes status, additions, deletions, review state, and an
    explained review-order score.
 4. Unified and split views preserve line numbers and support an addressable
@@ -81,6 +88,14 @@ changed, where should I start, and what have I already checked?
     state why they became stale, and are never rendered on a guessed line.
 18. Duplicate revisions are rejected, revision switching restores each slice's
     local review record, and raw revision contents are never persisted.
+19. Multi-forge imports accept only canonical HTTPS URLs on an exact host
+    allowlist, construct download/API paths internally, reject redirects, and
+    share the 5 MiB response bound and stable error envelope.
+20. Editor links are generated only after the reviewer provides an absolute
+    local workspace path. Path segments are URL-encoded and no file contents or
+    workspace paths leave the browser.
+21. The command palette is keyboard and touch accessible, and every export is a
+    local copy/download action with an explicit destination-oriented label.
 
 ## Architecture decisions
 
@@ -99,15 +114,16 @@ changed, where should I start, and what have I already checked?
 - Change Atlas is an owned, dependency-free classifier over normalized file
   metadata. It returns a stable layer and a human-readable reason; the UI calls
   its output a suggestion rather than a dependency graph.
-- `/api/github` accepts only a normalized GitHub URL. It builds GitHub REST
-  endpoints internally and returns raw diff text with source metadata.
+- `/api/change` dispatches normalized URLs to exact-host provider adapters. Each
+  adapter builds its API or `.diff` endpoint internally and returns raw unified
+  diff text with source metadata. `/api/github` remains a compatibility alias.
 - In-memory cache entries store ETag, payload, and expiry only. Patches are
   never logged or persisted by the server.
 
 ## Quality budgets
 
 - Raw local input: 5 MiB maximum.
-- GitHub response: 5 MiB maximum after decompression.
+- Provider response: 5 MiB maximum after decompression.
 - File count: 2,000 maximum; line count: 100,000 changed/context lines maximum.
 - No blocking operation should run before input is submitted.
 - The interface must remain usable at 320 CSS pixels and 200% zoom.

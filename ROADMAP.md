@@ -22,7 +22,7 @@ Model revisions explicitly. Import commit ranges, show changes since the last
 review, retain unaffected progress, invalidate stale anchors honestly, and let
 reviewers move through a stack one slice at a time.
 
-## Phase 4: Review OS
+## Phase 4: Review OS — shipped
 
 Add public GitLab and Forgejo/Gitea imports behind the same bounded provider
 contract. Offer editor deep links, a command palette, and deliberate exports to

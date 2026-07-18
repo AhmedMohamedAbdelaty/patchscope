@@ -50,7 +50,7 @@ export interface DiffStats {
 }
 
 export interface DiffSource {
-  kind: "paste" | "upload" | "github" | "sample";
+  kind: "paste" | "upload" | "github" | "provider" | "sample";
   label: string;
   url?: string;
 }

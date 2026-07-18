@@ -10,7 +10,7 @@ export default define.page(function Home() {
         <title>Patchscope: review the change, not the noise</title>
         <meta
           name="description"
-          content="A local-first workspace for reviewing patches and public GitHub changes in a deliberate order."
+          content="A local-first workspace for reviewing patches and public forge changes in a deliberate order."
         />
       </Head>
       <ReviewWorkspace sampleDiff={SAMPLE_DIFF} />

@@ -1,5 +1,23 @@
 # Implementation notes
 
+## Phase 4 gate
+
+- Goal: make Patchscope a useful read-only review operating surface across major
+  public forges and local tools without acquiring provider write authority.
+- Unknowns checked against current official docs and live public endpoints:
+  GitLab supports plain merge-request diffs; Gitea documents commit `.diff`
+  responses; Codeberg and Gitea.com both returned commit diffs; only Codeberg's
+  tested pull diff stayed public. Redirects therefore remain errors.
+- Success criteria: exact-host parsing for GitLab.com, Codeberg, and Gitea.com;
+  shared byte/time/error bounds; no redirect following; working command palette;
+  encoded editor deep links; distinct issue and review-memo exports; and the
+  full local, browser, security, slop, push, Action, and production gates.
+- Steps: add bounded provider adapters; route the generic endpoint; add pure
+  editor/export helpers; connect commands and UI; verify; push; match
+  production.
+- Out of scope: arbitrary self-hosted forges, private repositories, OAuth,
+  provider writes, automatic issue creation, and detecting a local checkout.
+
 ## Phase 3 gate
 
 - Goal: compare adjacent diff revisions without inventing repository history or
@@ -130,6 +148,16 @@
 - 2026-07-18: Native disclosure panels overlapped at 320 px. The revision rail
   now permits only one of the import or stale-evidence panels to be open, and
   anchors both panels to the rail on narrow screens.
+- 2026-07-18: Phase 4 limits remote hosts to `github.com`, `gitlab.com`,
+  `codeberg.org`, and `gitea.com`. Supporting arbitrary self-hosted instances
+  would require DNS rebinding defenses and a managed allowlist, not URL parsing
+  alone.
+- 2026-07-18: Gitea.com redirected a public pull-diff request to login while its
+  public commit-diff API worked. Forge fetches use `redirect: manual`;
+  Patchscope explains the sign-in boundary and never follows the response.
+- 2026-07-18: Editor links require an absolute browser-local workspace root.
+  Diff paths cannot contain empty, dot, or parent segments, and every segment is
+  URL-encoded before creating the documented VS Code scheme.
 
 ## Questions for review
 
@@ -143,5 +171,8 @@
 - Most revisitable decision: optional AI remains behind the evidence model.
 - Edge cases recorded: 31, including exact rename matching, stale anchors,
   duplicate revisions, stack branching, and overlapping touch disclosures.
-- Next session should read `SPEC.md` before changing revision behavior.
+- Phase 4 adds exact-host multi-forge reads, local editor links, a command
+  palette, and destination-specific drafts without provider write authority.
+- Next session should read `SPEC.md` before changing provider or export
+  behavior.
 - Release proof requires a green Action and matching `/health` revision.
