@@ -77,6 +77,9 @@
 - 2026-07-18: Deploying local source does not link an existing app to GitHub.
   Repository linking is an App Settings operation; its proof is a new build with
   GitHub source metadata triggered by a push.
+- 2026-07-18: The Deno Deploy CLI appends a blank line to `deno.json` even for a
+  read-only revision listing. Remove that formatting-only mutation before
+  committing so deployment diagnostics do not create unrelated config churn.
 
 ## Questions for review
 
@@ -88,6 +91,6 @@
 - Deviations recorded: 5; the latest replaces manual releases with GitHub
   builds.
 - Most revisitable decision: optional AI remains behind the evidence model.
-- Edge cases recorded: 16, including local deploys not creating a source link.
+- Edge cases recorded: 17, including local deploys not creating a source link.
 - Next session should read `DEPLOYMENT.md` before changing release behavior.
 - Live proof requires a GitHub-triggered revision on the Production timeline.
