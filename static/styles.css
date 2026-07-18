@@ -2036,6 +2036,319 @@ mark {
   font-size: 0.68rem;
 }
 
+.team-handoff {
+  width: min(1180px, calc(100% - 28px));
+  max-height: min(820px, calc(100vh - 28px));
+  padding: 0;
+  border: 1px solid var(--ink);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 24px 70px color-mix(in srgb, var(--ink), transparent 72%);
+}
+
+.team-handoff::backdrop {
+  background: color-mix(in srgb, var(--ink), transparent 48%);
+}
+
+.team-handoff > header,
+.team-handoff > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 13px 17px;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.team-handoff > header h2,
+.team-handoff h3 {
+  margin: 0;
+}
+
+.team-handoff > header h2 {
+  margin-top: 3px;
+  font-size: 1.08rem;
+}
+
+.team-handoff > header button {
+  min-width: 44px;
+  min-height: 36px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--muted);
+  font: 0.68rem var(--code);
+}
+
+.team-layout {
+  display: grid;
+  grid-template-columns: 270px minmax(420px, 1fr) 320px;
+  min-height: 550px;
+  max-height: calc(min(820px, 100vh - 28px) - 106px);
+  overflow: auto;
+}
+
+.identity-panel,
+.rules-panel,
+.handoff-panel {
+  min-width: 0;
+  padding: 16px;
+}
+
+.identity-panel,
+.rules-panel {
+  border-right: 1px solid var(--line-strong);
+}
+
+.identity-panel {
+  display: grid;
+  align-content: start;
+  gap: 13px;
+  background: var(--surface-muted);
+}
+
+.identity-panel > header {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.identity-mark {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--surface);
+  font: 0.72rem var(--code);
+}
+
+.team-handoff h3 {
+  font-size: 0.78rem;
+}
+
+.team-handoff p,
+.team-handoff small {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.identity-panel > label,
+.handoff-panel > label {
+  display: grid;
+  gap: 5px;
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.identity-panel input,
+.handoff-panel input,
+.team-rules input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  padding: 7px 9px;
+  font-size: 0.74rem;
+}
+
+.selected-coverage {
+  display: grid;
+  gap: 7px;
+  margin-top: 3px;
+  padding: 11px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.selected-coverage > strong {
+  overflow-wrap: anywhere;
+  font: 0.67rem var(--code);
+}
+
+.selected-coverage ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.selected-coverage li {
+  display: grid;
+  gap: 2px;
+  padding-left: 8px;
+  border-left: 2px solid var(--blue);
+  font-size: 0.67rem;
+}
+
+.selected-coverage li span {
+  color: var(--blue);
+  font: 0.64rem var(--code);
+}
+
+.rules-panel {
+  background: var(--canvas);
+}
+
+.rules-panel > header,
+.handoff-panel > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+  margin-bottom: 13px;
+}
+
+.rules-panel > header button {
+  min-width: 76px;
+  min-height: 34px;
+  border: 1px solid var(--ink);
+  background: transparent;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.team-rules {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.team-rules li {
+  display: grid;
+  grid-template-columns: 26px minmax(105px, 0.8fr) minmax(95px, 0.7fr)
+    minmax(140px, 1fr) auto;
+  gap: 7px;
+  align-items: end;
+  padding: 9px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.team-rules li > span {
+  align-self: center;
+  color: var(--muted);
+  font: 0.65rem var(--code);
+}
+
+.team-rules label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 0.61rem;
+}
+
+.team-rules input {
+  min-height: 34px;
+  padding: 6px 7px;
+  color: var(--ink);
+  font: 0.66rem var(--code);
+}
+
+.team-rules li > button {
+  min-height: 34px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.63rem;
+  text-decoration: underline;
+}
+
+.handoff-panel {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.handoff-panel > header {
+  display: block;
+  margin: 0;
+}
+
+.handoff-panel > header p {
+  font-family: var(--code);
+}
+
+.publication-receipt {
+  display: grid;
+  gap: 8px;
+  padding: 11px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-muted);
+}
+
+.publication-receipt > strong {
+  font-size: 0.72rem;
+}
+
+.publication-receipt dl {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.publication-receipt dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.67rem;
+}
+
+.publication-receipt dd {
+  margin: 0;
+  font: 0.66rem var(--code);
+}
+
+.handoff-primary {
+  min-height: 43px;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--surface);
+  font-weight: 700;
+}
+
+.handoff-import {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--line-strong);
+}
+
+.handoff-import button {
+  min-width: 0;
+  min-height: 40px;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.67rem;
+}
+
+.handoff-import button + button {
+  border-left: 1px solid var(--line-strong);
+  background: var(--surface-muted);
+}
+
+.handoff-message {
+  min-height: 48px;
+}
+
+.team-handoff > footer {
+  min-height: 40px;
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
 .local-route-note,
 .context-receipt {
   display: grid;
@@ -2229,6 +2542,14 @@ mark {
 }
 
 @media (max-width: 980px) {
+  .team-layout {
+    grid-template-columns: 260px minmax(420px, 1fr);
+  }
+
+  .handoff-panel {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--line-strong);
+  }
   .empty-workspace {
     width: min(760px, calc(100% - 34px));
     grid-template-columns: 1fr;
@@ -2296,6 +2617,45 @@ mark {
   .evidence-lab > header button,
   .claim-convert,
   .evidence-run {
+    min-height: 44px;
+  }
+
+  .team-handoff {
+    width: calc(100% - 18px);
+    max-height: calc(100vh - 18px);
+  }
+
+  .team-layout {
+    grid-template-columns: 1fr;
+    max-height: calc(100vh - 124px);
+  }
+
+  .identity-panel,
+  .rules-panel,
+  .handoff-panel {
+    border-right: 0;
+    border-bottom: 1px solid var(--line-strong);
+  }
+
+  .handoff-panel {
+    grid-column: auto;
+  }
+
+  .team-rules li {
+    grid-template-columns: 24px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .team-rules li > label,
+  .team-rules li > button {
+    grid-column: 2;
+  }
+
+  .team-rules li > button,
+  .rules-panel > header button,
+  .handoff-import button,
+  .handoff-primary,
+  .team-handoff > header button {
     min-height: 44px;
   }
   .masthead {

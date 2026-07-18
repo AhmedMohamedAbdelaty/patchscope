@@ -30,9 +30,14 @@ Live at
   uses your request-only API key; Ollama stays on the fixed local
   `127.0.0.1:11434` route. Patchscope rejects citations that do not exactly
   match a sent line and never posts model output.
+- Open **Team handoff** to set a browser-local reviewer signature, attach simple
+  path ownership rules, and create a passphrase-encrypted `.patchscope.team`
+  file. The packet contains no patch lines and withholds every finding not
+  explicitly selected for publication.
 - Inputs are limited to 5 MiB, 2,000 files, and 100,000 review lines.
-- Private repositories, provider writes, accounts, autonomous AI review, and
-  server-side patch storage are out of scope.
+- Private repositories, provider writes, authenticated accounts, hosted team
+  presence, autonomous AI review, and server-side patch storage are out of
+  scope.
 
 ## Run locally
 
@@ -103,6 +108,8 @@ and the
   validation.
 - `lib/review/` validates portable, source-free review capsules and computes
   conservative transitions between revisions.
+- `lib/team/` validates path ownership intent and encrypts portable, source-free
+  team handoffs with Web Crypto.
 - `lib/server/` validates supported forge URLs, bounds provider reads, caches
   responses, and rate-limits imports.
 - `islands/ReviewWorkspace.tsx` coordinates the browser review loop.

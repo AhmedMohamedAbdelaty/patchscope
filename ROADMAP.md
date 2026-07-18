@@ -36,7 +36,7 @@ returns cited claims with evidence, confidence, and a reason the claim may be
 wrong. Reviewers can dismiss, keep, or convert a claim into a private finding;
 Patchscope never auto-posts it.
 
-## Phase 6: Identity and teams
+## Phase 6: Identity and teams — shipped
 
 Add profiles, encrypted review sharing, team review rules, and hosted
 collaboration only after portable artifacts prove the workflow. Keep personal

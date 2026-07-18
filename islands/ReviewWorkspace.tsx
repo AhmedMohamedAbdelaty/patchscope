@@ -1,6 +1,7 @@
 import { Fragment, type JSX } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { EvidenceLab } from "../components/EvidenceLab.tsx";
+import { TeamHandoff } from "../components/TeamHandoff.tsx";
 import {
   claimAnchor,
   claimFindingBody,
@@ -46,6 +47,7 @@ import {
   MAX_CAPSULE_BYTES,
   MAX_FINDING_BODY,
   parseReviewCapsule,
+  type PortableReviewState,
   type ReviewFinding,
   serializeReviewCapsule,
 } from "../lib/review/notebook.ts";
@@ -53,6 +55,14 @@ import {
   type RevisionDelta,
   transitionRevision,
 } from "../lib/review/revisions.ts";
+import type { TeamHandoff as TeamHandoffData } from "../lib/team/handoff.ts";
+import {
+  DEFAULT_TEAM_RULES,
+  type ReviewerProfile,
+  type TeamRule,
+  validateProfile,
+  validateTeamRules,
+} from "../lib/team/rules.ts";
 
 interface Props {
   sampleDiff: string;
@@ -126,6 +136,15 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [evidenceClaims, setEvidenceClaims] = useState<EvidenceClaim[]>([]);
+  const [teamOpen, setTeamOpen] = useState(false);
+  const [reviewerProfile, setReviewerProfile] = useState<ReviewerProfile>({
+    name: "",
+    handle: "",
+  });
+  const [teamName, setTeamName] = useState("Review team");
+  const [teamRules, setTeamRules] = useState<TeamRule[]>(() =>
+    DEFAULT_TEAM_RULES.map((rule) => ({ ...rule }))
+  );
   const [workspaceRoot, setWorkspaceRoot] = useState("");
   const [editorChannel, setEditorChannel] = useState<EditorChannel>("stable");
   const [notice, setNotice] = useState("");
@@ -172,6 +191,9 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
         reviewLens?: ReviewLens;
         workspaceRoot?: string;
         editorChannel?: EditorChannel;
+        reviewerProfile?: ReviewerProfile;
+        teamName?: string;
+        teamRules?: TeamRule[];
       };
       if (preferences.theme) setTheme(preferences.theme);
       if (preferences.viewStyle) setViewStyle(preferences.viewStyle);
@@ -187,6 +209,23 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
         preferences.editorChannel === "insiders"
       ) {
         setEditorChannel(preferences.editorChannel);
+      }
+      if (preferences.reviewerProfile) {
+        try {
+          setReviewerProfile(validateProfile(preferences.reviewerProfile));
+        } catch {
+          // Keep the empty local identity until the reviewer supplies one.
+        }
+      }
+      if (typeof preferences.teamName === "string" && preferences.teamName) {
+        setTeamName(preferences.teamName.slice(0, 100));
+      }
+      if (preferences.teamRules) {
+        try {
+          setTeamRules(validateTeamRules(preferences.teamRules));
+        } catch {
+          // Keep the documented starter rules when stored rules are invalid.
+        }
       }
     } catch {
       localStorage.removeItem("patchscope:preferences");
@@ -204,9 +243,22 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
         reviewLens,
         workspaceRoot,
         editorChannel,
+        reviewerProfile,
+        teamName,
+        teamRules,
       }),
     );
-  }, [theme, viewStyle, wrap, reviewLens, workspaceRoot, editorChannel]);
+  }, [
+    theme,
+    viewStyle,
+    wrap,
+    reviewLens,
+    workspaceRoot,
+    editorChannel,
+    reviewerProfile,
+    teamName,
+    teamRules,
+  ]);
 
   useEffect(() => setActiveAnchor(undefined), [selectedId]);
 
@@ -214,6 +266,8 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
     setEvidenceClaims([]);
     setEvidenceOpen(false);
   }, [review?.id, selected?.id]);
+
+  useEffect(() => setTeamOpen(false), [review?.id]);
 
   useEffect(() => {
     if (!review) return;
@@ -503,6 +557,7 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
     setAtlasLayer("all");
     setRevisions([]);
     setRevisionIndex(0);
+    setTeamOpen(false);
     history.replaceState(null, "", location.pathname);
   }
 
@@ -613,6 +668,39 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
           : "Review capsule could not be restored.",
       );
     }
+  }
+
+  async function restoreTeamHandoff(
+    restored: PortableReviewState,
+    handoff: TeamHandoffData,
+  ): Promise<void> {
+    if (!review) return;
+    const existing = new Map(
+      findingsRef.current.map((finding) => [finding.id, finding]),
+    );
+    for (const finding of restored.findings) {
+      if (!existing.has(finding.id)) existing.set(finding.id, finding);
+    }
+    const mergedFindings = [...existing.values()];
+    const mergedViewed = [...new Set([...viewed, ...restored.viewedFileIds])];
+    const restoredSelected = restored.selectedFileId ?? selected?.id;
+    await saveReview({
+      documentId: review.id,
+      viewedFileIds: mergedViewed,
+      selectedFileId: restoredSelected,
+      findings: mergedFindings,
+      updatedAt: new Date().toISOString(),
+    });
+    setViewed(new Set(mergedViewed));
+    replaceFindings(mergedFindings);
+    setSelectedId(restoredSelected);
+    setTeamName(handoff.teamName);
+    setTeamRules(handoff.rules.map((rule) => ({ ...rule })));
+    setNotice(
+      `Merged ${restored.findings.length} published finding${
+        restored.findings.length === 1 ? "" : "s"
+      } from ${handoff.sharedBy.name}; private local drafts were preserved.`,
+    );
   }
 
   async function addFinding(
@@ -756,6 +844,10 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
             setPaletteOpen(false);
             setEvidenceOpen(true);
           }}
+          onTeam={() => {
+            setPaletteOpen(false);
+            setTeamOpen(true);
+          }}
         />
       )}
       {review && selected && evidenceOpen && (
@@ -772,6 +864,24 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
               false,
             )}
           onClose={() => setEvidenceOpen(false)}
+        />
+      )}
+      {review && teamOpen && (
+        <TeamHandoff
+          review={review}
+          selectedFileId={selected?.id}
+          viewed={viewed}
+          findings={findings.filter((finding) => !finding.stale)}
+          profile={reviewerProfile}
+          teamName={teamName}
+          rules={teamRules}
+          onPreferences={(profile, name, rules) => {
+            setReviewerProfile(profile);
+            setTeamName(name);
+            setTeamRules(rules);
+          }}
+          onRestore={restoreTeamHandoff}
+          onClose={() => setTeamOpen(false)}
         />
       )}
 
@@ -849,6 +959,7 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
                       onPalette={() => setPaletteOpen(true)}
                       onEvidence={() => setEvidenceOpen(true)}
                       evidenceClaims={evidenceClaims.length}
+                      onTeam={() => setTeamOpen(true)}
                       editorLink={editorLink}
                     />
                     <DiffViewer
@@ -1095,6 +1206,7 @@ function CommandPalette(props: {
   onCopyIssue: () => void;
   onDownloadMemo: () => void;
   onEvidence: () => void;
+  onTeam: () => void;
 }) {
   const [query, setQuery] = useState("");
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -1133,6 +1245,11 @@ function CommandPalette(props: {
       label: "Open selected-file evidence lab",
       hint: "opt-in AI",
       run: props.onEvidence,
+    },
+    {
+      label: "Open encrypted team handoff",
+      hint: "team",
+      run: props.onTeam,
     },
     {
       label: "Download team review memo",
@@ -1674,6 +1791,7 @@ function FileToolbar(props: {
   onPalette: () => void;
   onEvidence: () => void;
   evidenceClaims: number;
+  onTeam: () => void;
   editorLink?: string;
 }) {
   const classification = classifyFile(props.file);
@@ -1783,6 +1901,13 @@ function FileToolbar(props: {
           onClick={props.onEvidence}
         >
           Evidence{props.evidenceClaims ? ` · ${props.evidenceClaims}` : ""}
+        </button>
+        <button
+          class="tool-button team-button"
+          type="button"
+          onClick={props.onTeam}
+        >
+          Team handoff
         </button>
         <button
           class="tool-button command-button"
@@ -2312,7 +2437,7 @@ function FindingEditor(
 ) {
   const [kind, setKind] = useState<FindingKind>(initial?.kind ?? "note");
   const [body, setBody] = useState(initial?.body ?? "");
-  const [included, setIncluded] = useState(initial?.included ?? true);
+  const [included, setIncluded] = useState(initial?.included ?? false);
   const [saving, setSaving] = useState(false);
   const valid = kind === "bookmark" || body.trim().length > 0;
   return (

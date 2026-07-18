@@ -46,6 +46,12 @@ what changed, where should I start, and what have I already checked?
 - Dismiss a model claim or convert it into an excluded private concern. Model
   output is session-only and is never posted, exported, or used to change review
   state automatically.
+- Define a browser-local reviewer identity and simple path-based team review
+  rules. Rules explain ownership intent for the selected file but never imply
+  that an approval happened.
+- Publish an encrypted, source-free team handoff. Only findings already marked
+  for Markdown publication enter the packet; excluded drafts remain local.
+  Import merges published findings without deleting private local work.
 - Explain every priority signal; never present heuristics as a security verdict.
 - Work with keyboard, touch, reduced motion, zoom, and narrow screens.
 
@@ -54,6 +60,8 @@ what changed, where should I start, and what have I already checked?
 - Provider writes, private repositories, accounts, comments posted to a
   provider, arbitrary forge hosts or URLs, autonomous AI review, server-side
   patch persistence, or persistence of a revision stack across reloads.
+- Hosted presence, chat, approval enforcement, identity verification, and
+  server-side storage of profiles or encrypted handoffs.
 - Claims that a change is safe, correct, or vulnerable.
 - Claims that path-based layers represent runtime or dependency relationships.
 
@@ -111,6 +119,18 @@ what changed, where should I start, and what have I already checked?
 24. A model claim needs evidence, confidence, and a reason it may be wrong.
     Client validation rejects missing lines, side mismatches, and inexact quotes
     before rendering. Conversion always creates a private, excluded finding.
+25. Reviewer identity and team rules persist only in browser preferences. The
+    interface calls them a local signature and review intent, not authentication
+    or an approval gate.
+26. A team rule uses one documented path form: exact path, directory prefix,
+    simple extension suffix, or all files. Invalid or ambiguous patterns are
+    rejected and unmatched files remain visibly unmatched.
+27. Team handoffs use authenticated AES-256-GCM encryption with a random IV and
+    a PBKDF2-HMAC-SHA-256 key derived from a passphrase and random salt. The
+    envelope records a bounded work factor and contains no passphrase.
+28. Handoffs contain a source-free review capsule, team rules, and local sender
+    signature. Export includes only explicitly published findings; import is
+    bound to the open document and preserves private local findings.
 
 ## Architecture decisions
 
@@ -139,12 +159,17 @@ what changed, where should I start, and what have I already checked?
   upstream URL and output schema and disables provider storage. Local Ollama is
   called by the browser at `127.0.0.1:11434` so local code does not pass through
   Patchscope's server.
+- Team collaboration begins as a portable encrypted artifact implemented with
+  browser Web Crypto. There is no team backend, encryption key escrow, presence
+  channel, or account claim. This makes the publication boundary testable before
+  introducing hosted state.
 
 ## Quality budgets
 
 - Raw local input: 5 MiB maximum.
 - Provider response: 5 MiB maximum after decompression.
 - AI selected-file context: 80 KiB; model response: 256 KiB.
+- Plaintext team handoff: 1 MiB; encrypted envelope: 2 MiB.
 - File count: 2,000 maximum; line count: 100,000 changed/context lines maximum.
 - No blocking operation should run before input is submitted.
 - The interface must remain usable at 320 CSS pixels and 200% zoom.

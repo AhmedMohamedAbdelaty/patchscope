@@ -95,3 +95,22 @@ Phase 5 follows the current provider contracts rather than adding an SDK:
 3. Make revisions a product primitive before provider write integrations.
 4. Treat AI as an optional evidence assistant, never a verdict engine.
 5. Keep the default workflow local, inspectable, and dependency-light.
+
+## Phase 6 identity and handoff verification
+
+- [GitHub CODEOWNERS](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners)
+  makes path ownership legible but also documents precedence and syntax that a
+  partial clone could easily misrepresent. Patchscope therefore offers only four
+  explicit local pattern forms and calls matches review intent, not code owner
+  enforcement.
+- [MDN's Web Crypto derivation guide](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/deriveKey)
+  documents deriving an AES-GCM key from PBKDF2 key material with a random salt
+  and using a 12-byte IV. Patchscope uses that browser-native boundary rather
+  than introducing a cryptography dependency.
+- [OWASP's current password guidance](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#pbkdf2)
+  recommends 600,000 PBKDF2-HMAC-SHA-256 iterations. The handoff envelope fixes
+  that export work factor and bounds accepted import factors to limit malicious
+  CPU work.
+- [OWASP's cryptographic storage guidance](https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html)
+  prefers AES with at least 128-bit keys and an authenticated mode. The handoff
+  uses AES-256-GCM and authenticates the Patchscope envelope context.

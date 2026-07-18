@@ -1,5 +1,26 @@
 # Implementation notes
 
+## Phase 6 gate
+
+- Goal: let reviewers identify their exported work, express team review intent,
+  and hand off deliberately published evidence without creating an account or
+  uploading source.
+- Unknowns checked against current GitHub, MDN, and OWASP guidance: full
+  CODEOWNERS semantics are too broad to imitate partially; Web Crypto supplies
+  PBKDF2 and AES-GCM directly; current PBKDF2-HMAC-SHA-256 guidance uses 600,000
+  iterations.
+- Success criteria: browser-local identity; explicit simple path rules; visible
+  unmatched coverage; an authenticated randomized encrypted envelope; no patch
+  lines, passphrases, excluded drafts, API keys, or workspace roots; document-
+  bound import; merge without local draft loss; and the full local, browser,
+  security, slop, push, Action, and production gates.
+- Steps: own the profile/rule contract; implement and test the encrypted
+  envelope; connect a publication receipt and import merge; verify; push; match
+  production.
+- Out of scope: login, verified identity, server storage, key recovery,
+  presence, chat, approvals, notification delivery, and provider permission
+  changes.
+
 ## Phase 5 gate
 
 - Goal: make model assistance inspectable and optional without turning
@@ -185,6 +206,16 @@
   Deno Deploy. This preserves the local route, but a production-origin browser
   may need that exact origin in `OLLAMA_ORIGINS`; Patchscope displays the
   command boundary instead of silently falling back to a cloud proxy.
+- 2026-07-18: Exporting the ordinary review capsule would disclose excluded
+  private findings. Team handoff builds a fresh capsule containing only findings
+  already marked for publication, then encrypts that source-free payload.
+- 2026-07-18: Team import merges published finding IDs and reviewed files into
+  the local record instead of replacing it. A portable handoff must never erase
+  the recipient's private drafts.
+- 2026-07-18: The Phase 6 publication audit found that new notebook entries
+  inherited an export-selected default. New findings now begin withheld; a
+  reviewer must explicitly select Markdown publication before any team handoff
+  can include them.
 
 ## Questions for review
 
