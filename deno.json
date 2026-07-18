@@ -9,6 +9,8 @@
     "test:coverage": "deno test -A --coverage=coverage && deno coverage coverage --clean"
   },
   "deploy": {
+    "org": "ahmedmohamedabdelaty",
+    "app": "patchscope",
     "framework": "fresh"
   },
   "lint": {

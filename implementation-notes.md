@@ -40,6 +40,10 @@
 - 2026-07-18: Quoted Git paths expose a trailing-quote quirk in the parser
   dependency. The adapter normalizes those paths and covers added, deleted,
   renamed, binary, whitespace-only, CRLF, empty, malformed, and bounded input.
+- 2026-07-18: The current `deno deploy` CLI uses `deploy.org` and `deploy.app`
+  as its checked-in application context. A framework-only `deploy` object is
+  valid build configuration but cannot be published locally until those fields
+  identify the target app.
 
 ## Questions for review
 
