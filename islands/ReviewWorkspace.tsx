@@ -18,6 +18,19 @@ import {
   type EditorChannel,
 } from "../lib/client/editor-link.ts";
 import {
+  type CodeFont,
+  type Density,
+  isCodeFont,
+  isDensity,
+  isMotion,
+  isTheme,
+  isTypeScale,
+  type Motion,
+  type Theme,
+  THEME_OPTIONS,
+  type TypeScale,
+} from "../lib/client/display-preferences.ts";
+import {
   type AtlasLayer,
   atlasLayerDetails,
   type AtlasLayerId,
@@ -70,7 +83,6 @@ interface Props {
 
 type ViewStyle = "unified" | "split";
 type SortStyle = "priority" | "path";
-type Theme = "system" | "light" | "dark";
 type AtlasSelection = "all" | AtlasLayerId;
 type AddFinding = (
   anchor: FindingAnchor,
@@ -133,6 +145,10 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
   const [fileQuery, setFileQuery] = useState("");
   const [codeQuery, setCodeQuery] = useState("");
   const [theme, setTheme] = useState<Theme>("system");
+  const [density, setDensity] = useState<Density>("comfortable");
+  const [typeScale, setTypeScale] = useState<TypeScale>("standard");
+  const [codeFont, setCodeFont] = useState<CodeFont>("default");
+  const [motion, setMotion] = useState<Motion>("system");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [evidenceClaims, setEvidenceClaims] = useState<EvidenceClaim[]>([]);
@@ -186,6 +202,10 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
     try {
       const preferences = JSON.parse(stored) as {
         theme?: Theme;
+        density?: Density;
+        typeScale?: TypeScale;
+        codeFont?: CodeFont;
+        motion?: Motion;
         viewStyle?: ViewStyle;
         wrap?: boolean;
         reviewLens?: ReviewLens;
@@ -195,7 +215,13 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
         teamName?: string;
         teamRules?: TeamRule[];
       };
-      if (preferences.theme) setTheme(preferences.theme);
+      if (isTheme(preferences.theme)) setTheme(preferences.theme);
+      if (isDensity(preferences.density)) setDensity(preferences.density);
+      if (isTypeScale(preferences.typeScale)) {
+        setTypeScale(preferences.typeScale);
+      }
+      if (isCodeFont(preferences.codeFont)) setCodeFont(preferences.codeFont);
+      if (isMotion(preferences.motion)) setMotion(preferences.motion);
       if (preferences.viewStyle) setViewStyle(preferences.viewStyle);
       if (typeof preferences.wrap === "boolean") setWrap(preferences.wrap);
       if (isReviewLens(preferences.reviewLens)) {
@@ -234,10 +260,18 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    document.documentElement.dataset.density = density;
+    document.documentElement.dataset.typeScale = typeScale;
+    document.documentElement.dataset.codeFont = codeFont;
+    document.documentElement.dataset.motion = motion;
     localStorage.setItem(
       "patchscope:preferences",
       JSON.stringify({
         theme,
+        density,
+        typeScale,
+        codeFont,
+        motion,
         viewStyle,
         wrap,
         reviewLens,
@@ -250,6 +284,10 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
     );
   }, [
     theme,
+    density,
+    typeScale,
+    codeFont,
+    motion,
     viewStyle,
     wrap,
     reviewLens,
@@ -794,7 +832,18 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
         </a>
         <p class="masthead-purpose">Review the change. Keep your place.</p>
         <div class="masthead-actions">
-          <ThemeControl theme={theme} onChange={setTheme} />
+          <DisplayControl
+            theme={theme}
+            density={density}
+            typeScale={typeScale}
+            codeFont={codeFont}
+            motion={motion}
+            onTheme={setTheme}
+            onDensity={setDensity}
+            onTypeScale={setTypeScale}
+            onCodeFont={setCodeFont}
+            onMotion={setMotion}
+          />
           <details class="help-menu">
             <summary aria-label="Keyboard help">
               <HelpIcon />
@@ -2592,28 +2641,124 @@ function FindingCard(
   );
 }
 
-function ThemeControl(
-  { theme, onChange }: { theme: Theme; onChange: (theme: Theme) => void },
-) {
-  const next: Record<Theme, Theme> = {
-    system: "light",
-    light: "dark",
-    dark: "system",
-  };
+function DisplayControl(props: {
+  theme: Theme;
+  density: Density;
+  typeScale: TypeScale;
+  codeFont: CodeFont;
+  motion: Motion;
+  onTheme: (value: Theme) => void;
+  onDensity: (value: Density) => void;
+  onTypeScale: (value: TypeScale) => void;
+  onCodeFont: (value: CodeFont) => void;
+  onMotion: (value: Motion) => void;
+}) {
   return (
-    <button
-      class="theme-button"
-      type="button"
-      onClick={() => onChange(next[theme])}
-      aria-label={`Color theme: ${theme}. Change theme.`}
-    >
-      {theme === "dark"
-        ? <MoonIcon />
-        : theme === "light"
-        ? <SunIcon />
-        : <SystemIcon />}
-      <span>{theme}</span>
-    </button>
+    <details class="display-menu">
+      <summary aria-label={`Display settings. Current theme: ${props.theme}.`}>
+        <SystemIcon />
+        <span>Display</span>
+      </summary>
+      <div class="display-panel">
+        <header>
+          <strong>Display settings</strong>
+          <small>Stored only in this browser</small>
+        </header>
+        <fieldset class="theme-choices">
+          <legend>Theme</legend>
+          {THEME_OPTIONS.map((option) => (
+            <label key={option.value} data-theme-choice={option.value}>
+              <input
+                type="radio"
+                name="display-theme"
+                value={option.value}
+                checked={props.theme === option.value}
+                onChange={() =>
+                  props.onTheme(option.value)}
+              />
+              <i aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </i>
+              {option.label}
+            </label>
+          ))}
+        </fieldset>
+        <DisplayRadioGroup
+          label="Density"
+          name="display-density"
+          value={props.density}
+          options={[
+            ["comfortable", "Comfortable"],
+            ["compact", "Compact"],
+          ]}
+          onChange={(value) => props.onDensity(value as Density)}
+        />
+        <DisplayRadioGroup
+          label="Text size"
+          name="display-type-scale"
+          value={props.typeScale}
+          options={[["small", "Small"], ["standard", "Standard"], [
+            "large",
+            "Large",
+          ]]}
+          onChange={(value) => props.onTypeScale(value as TypeScale)}
+        />
+        <DisplayRadioGroup
+          label="Code face"
+          name="display-code-font"
+          value={props.codeFont}
+          options={[["default", "Plex-style"], ["system", "System mono"], [
+            "sans",
+            "Sans",
+          ]]}
+          onChange={(value) => props.onCodeFont(value as CodeFont)}
+        />
+        <label class="motion-choice">
+          <input
+            type="checkbox"
+            checked={props.motion === "reduced"}
+            onChange={(event) =>
+              props.onMotion(
+                event.currentTarget.checked ? "reduced" : "system",
+              )}
+          />
+          <span>
+            <strong>Reduce motion</strong>
+            <small>System preference is always respected.</small>
+          </span>
+        </label>
+      </div>
+    </details>
+  );
+}
+
+function DisplayRadioGroup(props: {
+  label: string;
+  name: string;
+  value: string;
+  options: ReadonlyArray<readonly [string, string]>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <fieldset class="display-radio-group">
+      <legend>{props.label}</legend>
+      <div class="display-options">
+        {props.options.map(([value, label]) => (
+          <label key={value}>
+            <input
+              type="radio"
+              name={props.name}
+              value={value}
+              checked={props.value === value}
+              onChange={() => props.onChange(value)}
+            />
+            {label}
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 
@@ -3083,17 +3228,6 @@ const BinaryIcon = () => (
 const FileIcon = () => (
   <Icon size={28}>
     <path d="M5 3h10l4 4v14H5zM15 3v5h4" />
-  </Icon>
-);
-const MoonIcon = () => (
-  <Icon size={16}>
-    <path d="M20 15.5A8 8 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5z" />
-  </Icon>
-);
-const SunIcon = () => (
-  <Icon size={16}>
-    <circle cx="12" cy="12" r="3.5" />
-    <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
   </Icon>
 );
 const SystemIcon = () => (

@@ -52,6 +52,9 @@ what changed, where should I start, and what have I already checked?
 - Publish an encrypted, source-free team handoff. Only findings already marked
   for Markdown publication enter the packet; excluded drafts remain local.
   Import merges published findings without deleting private local work.
+- Choose system, light, dark, paper, terminal, high-contrast, or color-safe
+  semantic themes. Adjust review density, type scale, code face, and motion
+  without changing the review model or uploading a preference.
 - Explain every priority signal; never present heuristics as a security verdict.
 - Work with keyboard, touch, reduced motion, zoom, and narrow screens.
 
@@ -131,6 +134,17 @@ what changed, where should I start, and what have I already checked?
 28. Handoffs contain a source-free review capsule, team rules, and local sender
     signature. Export includes only explicitly published findings; import is
     bound to the open document and preserves private local findings.
+29. Every theme supplies the same semantic state tokens. Normal text and diff
+    state labels meet a measured 4.5:1 contrast ratio against their surfaces;
+    additions and deletions remain distinguishable by signs and labels, not
+    color alone.
+30. Display settings accept only documented values, persist in the existing
+    browser-local preference record, and ignore invalid stored values.
+31. Compact density, text scale, and code face change presentation only. Core
+    review actions remain operable by keyboard and touch at 320 CSS pixels.
+32. Explicit reduced motion suppresses non-essential animation and transition.
+    The operating-system reduced-motion preference is respected even when the
+    browser-local setting remains on system.
 
 ## Architecture decisions
 
@@ -163,6 +177,9 @@ what changed, where should I start, and what have I already checked?
   browser Web Crypto. There is no team backend, encryption key escrow, presence
   channel, or account claim. This makes the publication boundary testable before
   introducing hosted state.
+- The visual system is a finite set of semantic CSS custom properties and
+  validated preference unions. Themes do not fork component markup or review
+  behavior, and there is no runtime theme engine or user-authored CSS surface.
 
 ## Quality budgets
 

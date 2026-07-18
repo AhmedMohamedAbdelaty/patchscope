@@ -114,3 +114,21 @@ Phase 5 follows the current provider contracts rather than adding an SDK:
 - [OWASP's cryptographic storage guidance](https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html)
   prefers AES with at least 128-bit keys and an authenticated mode. The handoff
   uses AES-256-GCM and authenticates the Patchscope envelope context.
+
+## Phase 7 visual-system verification
+
+- [WCAG 2.2 contrast guidance](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html)
+  sets a 4.5:1 minimum for normal text and 3:1 for large text. Patchscope uses
+  the stricter 4.5:1 gate for its semantic text and diff-state token pairs in
+  every explicit theme.
+- [WCAG reflow guidance](https://www.w3.org/WAI/WCAG22/Understanding/reflow.html)
+  requires content to work at 320 CSS pixels without two-dimensional page
+  scrolling. The display panel switches from an anchored menu to a fixed,
+  viewport-bounded surface at narrow widths.
+- [W3C animation guidance](https://www.w3.org/WAI/WCAG22/Understanding/animation-from-interactions.html)
+  and the platform `prefers-reduced-motion` contract support disabling
+  non-essential motion. Patchscope offers an explicit local override while
+  retaining operating-system control by default.
+- The [Okabe-Ito color-universal palette](https://jfly.uni-koeln.de/color/)
+  informed the color-safe theme. Patchscope still uses `+`/`-` signs, words, and
+  borders because hue is never the only state carrier.

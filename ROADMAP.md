@@ -42,7 +42,7 @@ Add profiles, encrypted review sharing, team review rules, and hosted
 collaboration only after portable artifacts prove the workflow. Keep personal
 drafts private until explicitly published.
 
-## Phase 7: Visual system expansion
+## Phase 7: Visual system expansion — shipped
 
 Add paper, terminal, high-contrast, and color-vision-safe themes plus density,
 type scale, code font, and motion controls. Themes share semantic tokens and the

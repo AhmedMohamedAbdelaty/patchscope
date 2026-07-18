@@ -1,5 +1,25 @@
 # Implementation notes
 
+## Phase 7 gate
+
+- Goal: widen the visual system for long review sessions and varied access needs
+  without making themes a second component architecture.
+- Unknowns checked against current W3C and color-universal-design guidance:
+  normal text needs 4.5:1 contrast; 320 CSS-pixel reflow and operating-system
+  motion preferences need direct browser checks; color cannot be the only
+  carrier of diff state.
+- Success criteria: seven finite semantic themes; measured token contrast;
+  redundant diff signs and labels; validated browser-local density, scale,
+  code-face, and motion preferences; keyboard focus; 320 px containment; no
+  change to review behavior; and the full local, browser, slop, push, Action,
+  and production gates.
+- Steps: own the preference vocabulary; expand semantic tokens; connect one
+  native display disclosure; measure every explicit theme and control; push;
+  match production.
+- Out of scope: user-authored CSS, downloadable theme packages, runtime theme
+  dependencies, cloud-synced preferences, layout builders, and animated theme
+  transitions.
+
 ## Phase 6 gate
 
 - Goal: let reviewers identify their exported work, express team review intent,

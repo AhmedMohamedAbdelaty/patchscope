@@ -34,6 +34,9 @@ Live at
   path ownership rules, and create a passphrase-encrypted `.patchscope.team`
   file. The packet contains no patch lines and withholds every finding not
   explicitly selected for publication.
+- Open **Display** for paper, terminal, high-contrast, and color-safe themes,
+  along with density, text-size, code-face, and motion controls. These choices
+  stay in this browser and do not alter or export review data.
 - Inputs are limited to 5 MiB, 2,000 files, and 100,000 review lines.
 - Private repositories, provider writes, authenticated accounts, hosted team
   presence, autonomous AI review, and server-side patch storage are out of
