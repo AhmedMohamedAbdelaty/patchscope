@@ -1,7 +1,7 @@
 import type { DiffDocument, DiffFile } from "../diff/types.ts";
 
 export const REVIEW_CAPSULE_FORMAT = "patchscope.review";
-export const REVIEW_CAPSULE_VERSION = 1;
+export const REVIEW_CAPSULE_VERSION = 2;
 export const MAX_CAPSULE_BYTES = 1024 * 1024;
 export const MAX_FINDINGS = 5_000;
 export const MAX_FINDING_BODY = 10_000;
@@ -24,6 +24,10 @@ export interface ReviewFinding {
   included: boolean;
   createdAt: string;
   updatedAt: string;
+  stale?: {
+    reason: "file-changed" | "file-removed";
+    fromDocumentId: string;
+  };
 }
 
 export interface PortableReviewState {
@@ -32,7 +36,7 @@ export interface PortableReviewState {
   findings: ReviewFinding[];
 }
 
-export interface ReviewCapsuleV1 {
+export interface ReviewCapsuleV2 {
   format: typeof REVIEW_CAPSULE_FORMAT;
   version: typeof REVIEW_CAPSULE_VERSION;
   exportedAt: string;
@@ -48,7 +52,7 @@ export function serializeReviewCapsule(
   document: DiffDocument,
   review: PortableReviewState,
 ): string {
-  const capsule: ReviewCapsuleV1 = {
+  const capsule: ReviewCapsuleV2 = {
     format: REVIEW_CAPSULE_FORMAT,
     version: REVIEW_CAPSULE_VERSION,
     exportedAt: new Date().toISOString(),
@@ -83,7 +87,7 @@ export function parseReviewCapsule(
   if (!isRecord(value) || value.format !== REVIEW_CAPSULE_FORMAT) {
     throw new Error("This file is not a Patchscope review capsule.");
   }
-  if (value.version !== REVIEW_CAPSULE_VERSION) {
+  if (value.version !== 1 && value.version !== REVIEW_CAPSULE_VERSION) {
     throw new Error(
       `Review capsule version ${String(value.version)} is not supported.`,
     );
@@ -160,10 +164,13 @@ function readFinding(
   ) {
     throw new Error("Review capsule contains an invalid line anchor.");
   }
+  const stale = readStale(value.stale);
   const file = files.find((candidate) => candidate.id === anchor.fileId);
   if (
-    !file || file.path !== anchor.filePath ||
-    !lineExists(file, anchor.side, anchor.line as number)
+    !stale && (
+      !file || file.path !== anchor.filePath ||
+      !lineExists(file, anchor.side, anchor.line as number)
+    )
   ) {
     throw new Error("Review capsule contains a stale line anchor.");
   }
@@ -175,7 +182,7 @@ function readFinding(
   ) {
     throw new Error("Review capsule contains invalid finding content.");
   }
-  return {
+  const finding: ReviewFinding = {
     id: value.id,
     kind: value.kind,
     anchor: {
@@ -188,6 +195,24 @@ function readFinding(
     included: value.included,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
+  };
+  if (stale) finding.stale = stale;
+  return finding;
+}
+
+function readStale(value: unknown): ReviewFinding["stale"] {
+  if (value === undefined) return undefined;
+  if (
+    !isRecord(value) ||
+    (value.reason !== "file-changed" && value.reason !== "file-removed") ||
+    typeof value.fromDocumentId !== "string" || !value.fromDocumentId ||
+    value.fromDocumentId.length > 128
+  ) {
+    throw new Error("Review capsule contains invalid stale evidence.");
+  }
+  return {
+    reason: value.reason,
+    fromDocumentId: value.fromDocumentId,
   };
 }
 
@@ -220,5 +245,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function copyFinding(finding: ReviewFinding): ReviewFinding {
-  return { ...finding, anchor: { ...finding.anchor } };
+  return {
+    ...finding,
+    anchor: { ...finding.anchor },
+    stale: finding.stale ? { ...finding.stale } : undefined,
+  };
 }

@@ -55,7 +55,12 @@ function formatFinding(finding: ReviewFinding): string {
     finding.anchor.side === "old" ? "old" : "new"
   } line ${finding.anchor.line})`;
   const body = finding.body.trim() ? `: ${escapeText(finding.body)}` : "";
-  return `- **${kind}** — ${location}${body}`;
+  const stale = finding.stale
+    ? ` **[stale: ${
+      finding.stale.reason === "file-removed" ? "file removed" : "file changed"
+    }]**`
+    : "";
+  return `- **${kind}**${stale} — ${location}${body}`;
 }
 
 function escapeText(value: string): string {

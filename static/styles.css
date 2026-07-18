@@ -499,7 +499,7 @@ kbd {
   min-width: 0;
   min-height: calc(100vh - 56px);
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   overflow-x: clip;
 }
 
@@ -514,6 +514,186 @@ kbd {
   padding: 13px 22px;
   border-bottom: 1px solid var(--line-strong);
   background: var(--surface);
+}
+
+.revision-rail {
+  position: relative;
+  z-index: 30;
+  min-width: 0;
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 8px 22px;
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--surface-raised);
+}
+
+.revision-track {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.revision-track .eyebrow {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.revision-track ol {
+  min-width: 0;
+  display: flex;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  list-style: none;
+  scrollbar-width: thin;
+}
+
+.revision-track button {
+  max-width: 210px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 7px;
+  padding: 6px 9px;
+  border-color: transparent;
+  background: transparent;
+  text-align: left;
+}
+
+.revision-track button[aria-current="step"] {
+  border-color: var(--line-strong);
+  background: var(--surface);
+}
+
+.revision-track button span {
+  color: var(--muted);
+  font: 0.63rem/1.5 var(--code);
+}
+
+.revision-track button strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+}
+
+.revision-delta {
+  flex: 0 0 auto;
+  display: flex;
+  margin: 0 0 0 auto;
+}
+
+.revision-delta div {
+  min-width: 48px;
+  padding: 0 8px;
+  border-left: 1px solid var(--line);
+  text-align: center;
+}
+
+.revision-delta dt {
+  color: var(--muted);
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.revision-delta dd {
+  margin: 2px 0 0;
+  font: 0.72rem/1 var(--code);
+}
+
+.add-revision,
+.stale-evidence {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.add-revision > summary,
+.stale-evidence > summary {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  font-size: 0.68rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.revision-importer,
+.stale-evidence > ul {
+  position: absolute;
+  right: 0;
+  width: min(440px, calc(100vw - 24px));
+  margin: 0;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--ink), transparent 88%);
+}
+
+.revision-importer {
+  top: calc(100% + 5px);
+  display: grid;
+  gap: 9px;
+  padding: 14px;
+}
+
+.revision-importer label {
+  color: var(--muted);
+  font-size: 0.67rem;
+}
+
+.revision-importer textarea {
+  min-height: 92px;
+  resize: vertical;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-raised);
+  color: var(--ink);
+  font: 0.68rem/1.45 var(--code);
+}
+
+.revision-importer button {
+  background: var(--surface-raised);
+}
+
+.stale-evidence > ul {
+  top: calc(100% + 5px);
+  max-height: 260px;
+  padding: 8px;
+  overflow: auto;
+  list-style: none;
+}
+
+.stale-evidence li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 3px 8px;
+  padding: 7px;
+  border-bottom: 1px solid var(--line);
+}
+
+.stale-evidence li span {
+  color: var(--deletion);
+  font-size: 0.64rem;
+  text-transform: uppercase;
+}
+
+.stale-evidence li code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.67rem;
+}
+
+.stale-evidence li p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.7rem;
 }
 
 .change-identity {
@@ -1663,6 +1843,46 @@ mark {
     grid-template-columns: 1fr;
     gap: 11px;
     padding: 10px 12px;
+  }
+
+  .revision-rail {
+    align-items: stretch;
+    gap: 7px;
+    padding: 7px 12px;
+    overflow: visible;
+  }
+
+  .revision-track {
+    flex: 1 1 auto;
+  }
+
+  .revision-track .eyebrow,
+  .revision-delta {
+    display: none;
+  }
+
+  .revision-track button {
+    max-width: 145px;
+  }
+
+  .add-revision > summary,
+  .stale-evidence > summary {
+    min-height: 44px;
+  }
+
+  .revision-track button {
+    min-height: 44px;
+  }
+
+  .add-revision,
+  .stale-evidence {
+    position: static;
+  }
+
+  .revision-importer,
+  .stale-evidence > ul {
+    top: calc(100% + 5px);
+    right: 12px;
   }
 
   .change-stats {

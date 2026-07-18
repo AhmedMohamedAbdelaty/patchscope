@@ -83,3 +83,28 @@ Deno.test("exportReview includes only deliberately selected findings", async () 
   );
   assertEquals(markdown.includes("Private"), false);
 });
+
+Deno.test("exportReview labels stale evidence instead of presenting a live anchor", async () => {
+  const document = await parseDiff(SAMPLE_DIFF, {
+    kind: "sample",
+    label: "Sample",
+  });
+  const markdown = exportReview(document, new Set(), [{
+    id: "stale-1",
+    kind: "concern",
+    anchor: {
+      fileId: "old-file",
+      filePath: "removed.ts",
+      side: "new",
+      line: 4,
+    },
+    body: "Recheck this behavior",
+    included: true,
+    createdAt: "2026-07-18T12:00:00.000Z",
+    updatedAt: "2026-07-18T12:00:00.000Z",
+    stale: { reason: "file-removed", fromDocumentId: document.id },
+  }]);
+
+  assertStringIncludes(markdown, "[stale: file removed]");
+  assertStringIncludes(markdown, "`removed.ts` (new line 4)");
+});

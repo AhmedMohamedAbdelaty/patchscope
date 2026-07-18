@@ -28,13 +28,19 @@ changed, where should I start, and what have I already checked?
   Markdown exports.
 - Export and restore a versioned review capsule containing progress, anchors,
   and findings but no diff contents.
+- Add adjacent local or public GitHub revisions to an in-memory review stack,
+  inspect their file delta, and move through the stack one revision at a time.
+- Carry reviewed state and active findings forward only when the normalized file
+  diff is identical. Preserve findings from changed or removed files as visibly
+  stale evidence without guessing a replacement line.
 - Explain every priority signal; never present heuristics as a security verdict.
 - Work with keyboard, touch, reduced motion, zoom, and narrow screens.
 
 ### Excluded
 
 - GitHub write access, private repositories, accounts, comments posted to a
-  provider, arbitrary URL fetching, AI review, or server-side patch persistence.
+  provider, arbitrary URL fetching, AI review, server-side patch persistence, or
+  persistence of a revision stack across reloads.
 - Claims that a change is safe, correct, or vulnerable.
 - Claims that path-based layers represent runtime or dependency relationships.
 
@@ -68,6 +74,13 @@ changed, where should I start, and what have I already checked?
 15. Review capsules are bounded, versioned, validated against the open change,
     and rejected atomically when malformed, unsupported, or stale. They never
     contain source or diff line contents.
+16. A revision transition classifies prior and next files as unchanged, updated,
+    added, or removed. Only an identical normalized file diff can carry reviewed
+    state or an active line anchor.
+17. Findings from updated or removed files remain available as stale evidence,
+    state why they became stale, and are never rendered on a guessed line.
+18. Duplicate revisions are rejected, revision switching restores each slice's
+    local review record, and raw revision contents are never persisted.
 
 ## Architecture decisions
 
@@ -80,6 +93,9 @@ changed, where should I start, and what have I already checked?
 - Notebook anchors use the immutable patch identity plus file identity, old/new
   side, and line number. Revision-aware migration belongs to the revision model
   rather than being guessed during import.
+- Revision matching uses path and explicit rename metadata, then compares owned
+  normalized hunk data. The stack exists only in page memory; each document's
+  ordinary review record remains independently durable in IndexedDB.
 - Change Atlas is an owned, dependency-free classifier over normalized file
   metadata. It returns a stable layer and a human-readable reason; the UI calls
   its output a suggestion rather than a dependency graph.

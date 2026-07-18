@@ -39,7 +39,7 @@ Deno.test("review capsule round-trips progress and anchored findings without sou
     selectedFileId: file.id,
     findings: [finding],
   });
-  assertStringIncludes(raw, '"version": 1');
+  assertStringIncludes(raw, '"version": 2');
   assertEquals(raw.includes("export async function openSession"), false);
   for (
     const content of document.files.flatMap((candidate) =>
@@ -97,16 +97,67 @@ Deno.test("review capsule rejects malformed versions and finding content", async
   assertThrows(
     () =>
       parseReviewCapsule(
-        JSON.stringify({ format: "patchscope.review", version: 2 }),
+        JSON.stringify({ format: "patchscope.review", version: 99 }),
         document,
       ),
     Error,
-    "version 2",
+    "version 99",
   );
   assertThrows(
     () => parseReviewCapsule(" ".repeat(MAX_CAPSULE_BYTES + 1), document),
     Error,
     "1 MiB limit",
+  );
+});
+
+Deno.test("review capsule accepts the source-free version 1 shape", async () => {
+  const document = await fixture();
+  const raw = serializeReviewCapsule(document, {
+    viewedFileIds: [document.files[0].id],
+    findings: [],
+  }).replace('"version": 2', '"version": 1');
+
+  assertEquals(parseReviewCapsule(raw, document), {
+    viewedFileIds: [document.files[0].id],
+    selectedFileId: undefined,
+    findings: [],
+  });
+});
+
+Deno.test("review capsule round-trips bounded stale evidence", async () => {
+  const document = await fixture();
+  const raw = serializeReviewCapsule(document, {
+    viewedFileIds: [],
+    findings: [{
+      id: "stale-1",
+      kind: "question",
+      anchor: {
+        fileId: "previous-file",
+        filePath: "removed.ts",
+        side: "old",
+        line: 7,
+      },
+      body: "Does this still apply?",
+      included: true,
+      createdAt: "2026-07-18T12:00:00.000Z",
+      updatedAt: "2026-07-18T12:00:00.000Z",
+      stale: { reason: "file-removed", fromDocumentId: "previous-document" },
+    }],
+  });
+  const restored = parseReviewCapsule(raw, document);
+  assertEquals(restored.findings[0].stale, {
+    reason: "file-removed",
+    fromDocumentId: "previous-document",
+  });
+
+  const invalid = raw.replace(
+    '"reason": "file-removed"',
+    '"reason": "moved-nearby"',
+  );
+  assertThrows(
+    () => parseReviewCapsule(invalid, document),
+    Error,
+    "invalid stale evidence",
   );
 });
 

@@ -1,5 +1,22 @@
 # Implementation notes
 
+## Phase 3 gate
+
+- Goal: compare adjacent diff revisions without inventing repository history or
+  moving review anchors heuristically.
+- Unknowns checked: normalized file IDs include parse order, GitHub compare URLs
+  are already accepted by the bounded adapter, and raw patches are intentionally
+  absent from IndexedDB. Therefore matching must use paths/rename metadata plus
+  normalized hunks, while the revision stack remains memory-only.
+- Success criteria: deterministic delta counts; exact-diff carry-forward; honest
+  stale evidence for changed/removed files; duplicate rejection; local and
+  GitHub adjacent imports; slice navigation; capsule compatibility; and the
+  existing check, test, build, browser, responsive, and production gates.
+- Steps: specify the transition; test the pure model; add compatible capsule
+  state; connect stack import/navigation; verify; push; match the live revision.
+- Out of scope: cloning repositories, fetching arbitrary refs, fuzzy anchors,
+  server persistence, provider writes, and cross-reload stack restoration.
+
 ## Deviations
 
 - 2026-07-18: Product research moved optional AI behind orientation, private
@@ -104,6 +121,15 @@
 - 2026-07-18: Two fast finding mutations can overlap before Preact rerenders.
   Mutations now derive from a synchronous notebook reference, expose busy state,
   and commit both changes without a last-write-wins loss.
+- 2026-07-18: Phase 3 compares owned normalized hunks after path or explicit
+  rename matching. A changed hunk, including shifted line coordinates, makes
+  every affected finding stale; no similarity threshold exists.
+- 2026-07-18: The revision stack is memory-only because persisting it would also
+  persist patch contents. Each slice still uses its ordinary digest-keyed review
+  record, so reopening that exact diff restores its progress and stale evidence.
+- 2026-07-18: Native disclosure panels overlapped at 320 px. The revision rail
+  now permits only one of the import or stale-evidence panels to be open, and
+  anchors both panels to the rail on narrow screens.
 
 ## Questions for review
 
@@ -112,9 +138,10 @@
 
 ## Summary
 
-- Deviations recorded: 7; Phase 2 defers anchor migration to revision-aware
-  code.
+- Deviations recorded: 8; Phase 3 keeps the stack memory-only to preserve the
+  source-free storage boundary.
 - Most revisitable decision: optional AI remains behind the evidence model.
-- Edge cases recorded: 23, including committed writes and concurrent findings.
-- Next session should read `SPEC.md` before changing notebook behavior.
+- Edge cases recorded: 31, including exact rename matching, stale anchors,
+  duplicate revisions, stack branching, and overlapping touch disclosures.
+- Next session should read `SPEC.md` before changing revision behavior.
 - Release proof requires a green Action and matching `/health` revision.

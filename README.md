@@ -19,6 +19,9 @@ Live at
 - Add private concerns, questions, notes, and bookmarks to diff lines. Choose
   which findings enter Markdown, or move review state in a metadata-only
   `.patchscope.json` capsule.
+- Add adjacent local or GitHub revisions to a temporary stack. Patchscope shows
+  the file delta, carries only identical-file progress, and keeps invalidated
+  findings visibly stale instead of guessing a nearby line.
 - Inputs are limited to 5 MiB, 2,000 files, and 100,000 review lines.
 - Private repositories, GitHub writes, accounts, AI review, and server-side
   patch storage are out of scope.
@@ -85,7 +88,8 @@ and the
 
 - `lib/diff/` owns parsing, priority signals, limits, and Markdown export.
 - `lib/client/` stores review progress in IndexedDB.
-- `lib/review/` validates portable, source-free review capsules.
+- `lib/review/` validates portable, source-free review capsules and computes
+  conservative transitions between revisions.
 - `lib/server/` validates GitHub URLs, bounds provider reads, caches responses,
   and rate-limits imports.
 - `islands/ReviewWorkspace.tsx` coordinates the browser review loop.

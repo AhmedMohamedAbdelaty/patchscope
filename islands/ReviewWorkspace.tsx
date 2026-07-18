@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
   deleteReview,
   loadReview,
+  type ReviewRecord,
   saveReview,
 } from "../lib/client/review-store.ts";
 import {
@@ -34,6 +35,10 @@ import {
   type ReviewFinding,
   serializeReviewCapsule,
 } from "../lib/review/notebook.ts";
+import {
+  type RevisionDelta,
+  transitionRevision,
+} from "../lib/review/revisions.ts";
 
 interface Props {
   sampleDiff: string;
@@ -70,6 +75,14 @@ interface GitHubBody {
   source: { label: string; webUrl: string };
 }
 
+interface RevisionSlice {
+  document: DiffDocument;
+  viewedFileIds: string[];
+  selectedFileId?: string;
+  findings: ReviewFinding[];
+  delta?: RevisionDelta;
+}
+
 const DIFF_PLACEHOLDER = `diff --git a/file.ts b/file.ts
 --- a/file.ts
 +++ b/file.ts
@@ -80,6 +93,8 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
   const [selectedId, setSelectedId] = useState<string>();
   const [viewed, setViewed] = useState<Set<string>>(new Set());
   const [findings, setFindings] = useState<ReviewFinding[]>([]);
+  const [revisions, setRevisions] = useState<RevisionSlice[]>([]);
+  const [revisionIndex, setRevisionIndex] = useState(0);
   const [activeAnchor, setActiveAnchor] = useState<FindingAnchor>();
   const [viewStyle, setViewStyle] = useState<ViewStyle>("unified");
   const [wrap, setWrap] = useState(true);
@@ -210,6 +225,8 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
       const next = await parseDiff(raw, source, title);
       const saved = await loadReview(next.id).catch(() => undefined);
       setReview(next);
+      setRevisions([sliceFromSaved(next, saved)]);
+      setRevisionIndex(0);
       setAtlasLayer("all");
       setViewed(new Set(saved?.viewedFileIds ?? []));
       replaceFindings(saved?.findings ?? []);
@@ -245,6 +262,67 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
     }
   }
 
+  async function addRevision(
+    raw: string,
+    source: DiffSource,
+    title?: string,
+  ) {
+    if (!review) return;
+    setLoading(true);
+    setError("");
+    setNotice("");
+    try {
+      if (revisionIndex !== revisions.length - 1) {
+        throw new Error("Open the newest revision before adding another one.");
+      }
+      const next = await parseDiff(raw, source, title);
+      if (revisions.some((slice) => slice.document.id === next.id)) {
+        throw new Error("That revision is already in this review stack.");
+      }
+      const transition = transitionRevision(review, next, {
+        viewedFileIds: [...viewed],
+        selectedFileId: selected?.id,
+        findings: findingsRef.current,
+      });
+      const saved = await loadReview(next.id).catch(() => undefined);
+      const carried = mergeReviewState(next, transition.review, saved);
+      const current = captureSlice(
+        review,
+        viewed,
+        selected?.id,
+        findingsRef.current,
+      );
+      const nextSlice: RevisionSlice = {
+        document: next,
+        ...carried,
+        delta: transition.delta,
+      };
+      const stack = revisions.map((slice, index) =>
+        index === revisionIndex ? { ...current, delta: slice.delta } : slice
+      );
+      stack.push(nextSlice);
+      setRevisions(stack);
+      setRevisionIndex(stack.length - 1);
+      restoreSlice(nextSlice);
+      history.replaceState(
+        null,
+        "",
+        source.url
+          ? `?github=${encodeURIComponent(source.url)}`
+          : location.pathname,
+      );
+      setNotice(revisionNotice(transition.delta, carried.findings));
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "The revision could not be added.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function importGitHub(value: string) {
     setLoading(true);
     setError("");
@@ -268,6 +346,61 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
       );
       setLoading(false);
     }
+  }
+
+  async function addGitHubRevision(value: string) {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch(
+        `/api/github?url=${encodeURIComponent(value)}`,
+      );
+      const body = await response.json() as GitHubBody & ImportErrorBody;
+      if (!response.ok) {
+        throw new Error(body.error?.message ?? "GitHub import failed.");
+      }
+      await addRevision(body.diff, {
+        kind: "github",
+        label: body.source.label,
+        url: body.source.webUrl,
+      }, body.source.label);
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "GitHub import failed.",
+      );
+      setLoading(false);
+    }
+  }
+
+  function switchRevision(index: number) {
+    if (!review || index === revisionIndex || !revisions[index]) return;
+    const stack = revisions.map((slice, candidate) =>
+      candidate === revisionIndex
+        ? {
+          ...captureSlice(review, viewed, selected?.id, findingsRef.current),
+          delta: slice.delta,
+        }
+        : slice
+    );
+    setRevisions(stack);
+    setRevisionIndex(index);
+    restoreSlice(stack[index]);
+    setNotice(`Opened revision ${index + 1} of ${stack.length}.`);
+  }
+
+  function restoreSlice(slice: RevisionSlice) {
+    setReview(slice.document);
+    setViewed(new Set(slice.viewedFileIds));
+    replaceFindings(slice.findings);
+    setSelectedId(
+      slice.selectedFileId &&
+        slice.document.files.some((file) => file.id === slice.selectedFileId)
+        ? slice.selectedFileId
+        : recommendedFile(slice.document.files)?.id,
+    );
+    setActiveAnchor(undefined);
+    setAtlasLayer("all");
+    setCodeQuery("");
   }
 
   function toggleViewed(fileId: string) {
@@ -308,6 +441,8 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
     setActiveAnchor(undefined);
     setCodeQuery("");
     setAtlasLayer("all");
+    setRevisions([]);
+    setRevisionIndex(0);
     history.replaceState(null, "", location.pathname);
   }
 
@@ -530,8 +665,17 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
             <ReviewHeader
               review={review}
               viewed={reviewedCount}
-              findings={findings.length}
+              findings={findings.filter((finding) => !finding.stale).length}
               onClose={closeReview}
+            />
+            <RevisionRail
+              slices={revisions}
+              current={revisionIndex}
+              loading={loading}
+              onSelect={switchRevision}
+              onAdd={addRevision}
+              onGitHub={addGitHubRevision}
+              onError={setError}
             />
             <div class="review-grid">
               <FileNavigator
@@ -542,7 +686,7 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
                 noiseHidden={noiseHidden}
                 selectedId={selected?.id}
                 viewed={viewed}
-                findings={findings}
+                findings={findings.filter((finding) => !finding.stale)}
                 query={fileQuery}
                 sortStyle={sortStyle}
                 filters={filters}
@@ -571,7 +715,8 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
                       onCopy={copySummary}
                       onDownload={downloadSummary}
                       onReset={resetProgress}
-                      findings={findings.length}
+                      findings={findings.filter((finding) => !finding.stale)
+                        .length}
                       capsuleRef={capsuleRef}
                       onDownloadCapsule={downloadCapsule}
                       onImportCapsule={importCapsule}
@@ -583,7 +728,7 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
                       wrap={wrap}
                       query={codeQuery}
                       findings={findings.filter((finding) =>
-                        finding.anchor.fileId === selected.id
+                        !finding.stale && finding.anchor.fileId === selected.id
                       )}
                       activeAnchor={activeAnchor}
                       onActiveAnchor={setActiveAnchor}
@@ -799,6 +944,181 @@ function ReviewHeader(
         <progress max="100" value={progress}>{progress}%</progress>
       </div>
     </header>
+  );
+}
+
+function RevisionRail(props: {
+  slices: RevisionSlice[];
+  current: number;
+  loading: boolean;
+  onSelect: (index: number) => void;
+  onAdd: (raw: string, source: DiffSource, title?: string) => Promise<void>;
+  onGitHub: (url: string) => Promise<void>;
+  onError: (message: string) => void;
+}) {
+  const [github, setGithub] = useState("");
+  const [pasted, setPasted] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+  const addRef = useRef<HTMLDetailsElement>(null);
+  const staleRef = useRef<HTMLDetailsElement>(null);
+  const slice = props.slices[props.current];
+  const stale = slice?.findings.filter((finding) => finding.stale) ?? [];
+
+  async function upload(event: JSX.TargetedEvent<HTMLInputElement, Event>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      props.onError("This file is larger than the 5 MiB import limit.");
+      return;
+    }
+    await props.onAdd(
+      await file.text(),
+      { kind: "upload", label: file.name },
+      file.name,
+    );
+  }
+
+  return (
+    <section class="revision-rail" aria-label="Revision stack">
+      <div class="revision-track">
+        <span class="eyebrow">DELTA TIME MACHINE</span>
+        <ol>
+          {props.slices.map((item, index) => (
+            <li key={item.document.id}>
+              <button
+                type="button"
+                aria-current={index === props.current ? "step" : undefined}
+                onClick={() => props.onSelect(index)}
+              >
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <strong>{item.document.title}</strong>
+              </button>
+            </li>
+          ))}
+        </ol>
+      </div>
+      {slice?.delta && (
+        <dl class="revision-delta" aria-label="Changes from previous revision">
+          <div>
+            <dt>Same</dt>
+            <dd>{slice.delta.unchanged}</dd>
+          </div>
+          <div>
+            <dt>Updated</dt>
+            <dd>{slice.delta.updated}</dd>
+          </div>
+          <div>
+            <dt>Added</dt>
+            <dd>{slice.delta.added}</dd>
+          </div>
+          <div>
+            <dt>Removed</dt>
+            <dd>{slice.delta.removed}</dd>
+          </div>
+        </dl>
+      )}
+      {stale.length > 0 && (
+        <details
+          ref={staleRef}
+          class="stale-evidence"
+          onToggle={(event) => {
+            if (event.currentTarget.open) {
+              addRef.current?.removeAttribute("open");
+            }
+          }}
+        >
+          <summary>
+            {stale.length} stale finding{stale.length === 1 ? "" : "s"}
+          </summary>
+          <ul>
+            {stale.map((finding) => (
+              <li key={finding.id}>
+                <span>
+                  {finding.stale?.reason === "file-removed"
+                    ? "Removed"
+                    : "Changed"}
+                </span>
+                <code>{finding.anchor.filePath}:{finding.anchor.line}</code>
+                <p>{finding.body || "Bookmark"}</p>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      <details
+        ref={addRef}
+        class="add-revision"
+        onToggle={(event) => {
+          if (event.currentTarget.open) {
+            staleRef.current?.removeAttribute("open");
+          }
+        }}
+      >
+        <summary>Add revision</summary>
+        <div class="revision-importer">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (github.trim()) void props.onGitHub(github.trim());
+            }}
+          >
+            <label for="revision-github">
+              GitHub commit, pull, or compare URL
+            </label>
+            <div class="input-action">
+              <input
+                id="revision-github"
+                type="url"
+                value={github}
+                onInput={(event) => setGithub(event.currentTarget.value)}
+                placeholder="https://github.com/owner/repo/compare/base...head"
+                disabled={props.loading}
+                required
+              />
+              <button type="submit" disabled={props.loading}>Add</button>
+            </div>
+          </form>
+          <label for="revision-diff">Or paste the adjacent diff</label>
+          <textarea
+            id="revision-diff"
+            value={pasted}
+            onInput={(event) => setPasted(event.currentTarget.value)}
+            placeholder={DIFF_PLACEHOLDER}
+            spellcheck={false}
+            disabled={props.loading}
+          />
+          <div class="dock-actions">
+            <button
+              type="button"
+              disabled={props.loading || !pasted.trim()}
+              onClick={() =>
+                void props.onAdd(pasted, {
+                  kind: "paste",
+                  label: "Pasted revision",
+                })}
+            >
+              Add pasted revision
+            </button>
+            <input
+              ref={fileRef}
+              class="visually-hidden"
+              type="file"
+              accept=".patch,.diff,text/x-diff,text/x-patch"
+              aria-label="Choose the next patch or diff revision"
+              onChange={upload}
+            />
+            <button
+              type="button"
+              disabled={props.loading}
+              onClick={() => fileRef.current?.click()}
+            >
+              Choose file
+            </button>
+          </div>
+        </div>
+      </details>
+    </section>
   );
 }
 
@@ -1899,6 +2219,75 @@ function filterAndSort(
 
 function recommendedFile(files: DiffFile[]): DiffFile | undefined {
   return files.toSorted((a, b) => b.priority - a.priority)[0];
+}
+
+function sliceFromSaved(
+  document: DiffDocument,
+  saved?: ReviewRecord,
+): RevisionSlice {
+  return {
+    document,
+    viewedFileIds: saved?.viewedFileIds ?? [],
+    selectedFileId: saved?.selectedFileId,
+    findings: saved?.findings ?? [],
+  };
+}
+
+function captureSlice(
+  document: DiffDocument,
+  viewed: ReadonlySet<string>,
+  selectedFileId: string | undefined,
+  findings: readonly ReviewFinding[],
+): RevisionSlice {
+  return {
+    document,
+    viewedFileIds: [...viewed],
+    selectedFileId,
+    findings: findings.map((finding) => ({
+      ...finding,
+      anchor: { ...finding.anchor },
+      stale: finding.stale ? { ...finding.stale } : undefined,
+    })),
+  };
+}
+
+function mergeReviewState(
+  document: DiffDocument,
+  carried: {
+    viewedFileIds: string[];
+    selectedFileId?: string;
+    findings: ReviewFinding[];
+  },
+  saved?: ReviewRecord,
+) {
+  if (!saved) return carried;
+  const fileIds = new Set(document.files.map((file) => file.id));
+  const findings = new Map(
+    carried.findings.map((finding) => [finding.id, finding]),
+  );
+  for (const finding of saved.findings ?? []) findings.set(finding.id, finding);
+  return {
+    viewedFileIds: [
+      ...new Set([
+        ...carried.viewedFileIds,
+        ...saved.viewedFileIds.filter((id) => fileIds.has(id)),
+      ]),
+    ],
+    selectedFileId: saved.selectedFileId && fileIds.has(saved.selectedFileId)
+      ? saved.selectedFileId
+      : carried.selectedFileId,
+    findings: [...findings.values()],
+  };
+}
+
+function revisionNotice(
+  delta: RevisionDelta,
+  findings: readonly ReviewFinding[],
+): string {
+  const stale = findings.filter((finding) => finding.stale).length;
+  return `Revision added: ${delta.unchanged} unchanged, ${delta.updated} updated, ${delta.added} added, ${delta.removed} removed.${
+    stale ? ` ${stale} finding${stale === 1 ? " is" : "s are"} now stale.` : ""
+  }`;
 }
 
 function compactHunk(hunk: DiffHunk, expanded: boolean): DisplayRow[] {

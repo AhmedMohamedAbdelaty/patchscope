@@ -3,20 +3,20 @@
 Each phase must remain useful on its own, pass the full local verification
 suite, be pushed as one reviewable release, and be smoke-tested in production.
 
-## Phase 1: Change Atlas
+## Phase 1: Change Atlas — shipped
 
 Turn a flat file list into a conservative suggested review route. Stable layers
 separate contracts, data, behavior, interface, tests, delivery, and low-signal
 artifacts. General, security, and test-focused lenses change the route, not the
 underlying classification. Every layer explains itself.
 
-## Phase 2: Review Notebook
+## Phase 2: Review Notebook — shipped
 
 Add private, line-anchored questions, concerns, notes, and bookmarks. Save them
 locally, include chosen findings in Markdown export, and define a versioned
 portable review capsule without uploading code by default.
 
-## Phase 3: Delta Time Machine
+## Phase 3: Delta Time Machine — shipped
 
 Model revisions explicitly. Import commit ranges, show changes since the last
 review, retain unaffected progress, invalidate stale anchors honestly, and let
