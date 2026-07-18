@@ -47,6 +47,9 @@
 - 2026-07-18: Creating the app with a 1 GiB build-memory override let Vite
   finish but failed Deno's Fresh artifact finalization. The deployment now uses
   the platform's 3 GiB default instead of carrying that artificial constraint.
+- 2026-07-18: The new platform exposes `DENO_DEPLOY=true` and identifies the
+  active revision through `DENO_DEPLOY_BUILD_ID`. Production smoke testing
+  caught the older value check and revision variable before handoff.
 
 ## Questions for review
 
@@ -60,4 +63,4 @@
 - Verified parsing, provider errors, rate limits, export safety, and
   persistence.
 - Verified light, dark, 320 px, keyboard, live GitHub, and production CSP paths.
-- Ready for repository setup and deployment on the new Deno Deploy platform.
+- Published from a clean Git repository to the new Deno Deploy platform.

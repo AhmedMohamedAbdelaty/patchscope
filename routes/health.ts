@@ -5,7 +5,8 @@ export const handler = define.handlers({
     return Response.json(
       {
         status: "ok",
-        revision: Deno.env.get("DENO_DEPLOY_REVISION_ID") ?? "local",
+        revision: Deno.env.get("DENO_DEPLOY_BUILD_ID") ??
+          Deno.env.get("DENO_DEPLOY_REVISION_ID") ?? "local",
       },
       { headers: { "Cache-Control": "no-store" } },
     );

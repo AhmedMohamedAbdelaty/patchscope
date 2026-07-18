@@ -3,6 +3,9 @@
 Patchscope reviews Git patches and public GitHub changes. It orders files with
 explained heuristics, tracks progress locally, and exports a Markdown ledger.
 
+Live at
+[patchscope.ahmedmohamedabdelaty.deno.net](https://patchscope.ahmedmohamedabdelaty.deno.net).
+
 ## Inputs and limits
 
 - Paste a unified Git diff or upload a `.patch`/`.diff` file. Local input never

@@ -20,7 +20,7 @@ app.use(
     );
     response.headers.set("Cross-Origin-Opener-Policy", "same-origin");
     response.headers.set("X-Frame-Options", "DENY");
-    if (Deno.env.get("DENO_DEPLOY") === "1") {
+    if (Deno.env.get("DENO_DEPLOY") === "true") {
       response.headers.set(
         "Strict-Transport-Security",
         "max-age=31536000; includeSubDomains",
