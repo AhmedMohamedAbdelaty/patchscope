@@ -2,6 +2,7 @@ import { assertEquals, assertStringIncludes } from "@std/assert";
 import { parseDiff } from "./parse.ts";
 import { exportReview } from "./export.ts";
 import { SAMPLE_DIFF } from "../sample.ts";
+import type { ReviewFinding } from "../review/notebook.ts";
 
 Deno.test("exportReview emits an honest checked and unchecked Markdown ledger", async () => {
   const document = await parseDiff(SAMPLE_DIFF, {
@@ -38,4 +39,47 @@ Deno.test("exportReview escapes user-controlled Markdown syntax", async () => {
   assertStringIncludes(markdown, "# Review: review \\# injected");
   assertStringIncludes(markdown, "Source: \\[local\\]");
   assertEquals(markdown.includes("\n# injected"), false);
+});
+
+Deno.test("exportReview includes only deliberately selected findings", async () => {
+  const document = await parseDiff(SAMPLE_DIFF, {
+    kind: "sample",
+    label: "Sample",
+  });
+  const file = document.files[0];
+  const line = file.hunks[0].lines.find((candidate) => candidate.newLine)!;
+  const base: ReviewFinding = {
+    id: "finding-1",
+    kind: "concern",
+    anchor: {
+      fileId: file.id,
+      filePath: file.path,
+      side: "new",
+      line: line.newLine!,
+    },
+    body: "Could <script> bypass the session check?",
+    included: true,
+    createdAt: "2026-07-18T12:00:00.000Z",
+    updatedAt: "2026-07-18T12:00:00.000Z",
+  };
+  const markdown = exportReview(document, new Set(), [
+    base,
+    {
+      ...base,
+      id: "finding-2",
+      kind: "note",
+      body: "Private",
+      included: false,
+    },
+  ]);
+
+  assertStringIncludes(
+    markdown,
+    "**Concern** — `src/auth/session.ts` (new line",
+  );
+  assertStringIncludes(
+    markdown,
+    "Could &lt;script&gt; bypass the session check?",
+  );
+  assertEquals(markdown.includes("Private"), false);
 });

@@ -1,9 +1,11 @@
 import { priorityLabel } from "./priority.ts";
 import type { DiffDocument } from "./types.ts";
+import type { ReviewFinding } from "../review/notebook.ts";
 
 export function exportReview(
   document: DiffDocument,
   viewedFileIds: ReadonlySet<string>,
+  findings: readonly ReviewFinding[] = [],
 ): string {
   const reviewed = document.files.filter((file) => viewedFileIds.has(file.id));
   const remaining = document.files.filter((file) =>
@@ -12,6 +14,7 @@ export function exportReview(
   const source = document.source.url
     ? `[${escapeText(document.source.label)}](${document.source.url})`
     : escapeText(document.source.label);
+  const includedFindings = findings.filter((finding) => finding.included);
   const lines = [
     `# Review: ${escapeText(document.title)}`,
     "",
@@ -35,13 +38,31 @@ export function exportReview(
       )
       : ["- None"]),
     "",
+    "## Findings",
+    "",
+    ...(includedFindings.length
+      ? includedFindings.map(formatFinding)
+      : ["- None selected for export"]),
+    "",
     "_Generated locally by Patchscope. Priority labels are navigation hints, not correctness or security findings._",
   ];
   return lines.join("\n");
 }
 
+function formatFinding(finding: ReviewFinding): string {
+  const kind = finding.kind[0].toUpperCase() + finding.kind.slice(1);
+  const location = `${codeSpan(finding.anchor.filePath)} (${
+    finding.anchor.side === "old" ? "old" : "new"
+  } line ${finding.anchor.line})`;
+  const body = finding.body.trim() ? `: ${escapeText(finding.body)}` : "";
+  return `- **${kind}** — ${location}${body}`;
+}
+
 function escapeText(value: string): string {
-  return value.replace(/[\r\n]+/g, " ").replace(/([\\[\]*_#])/g, "\\$1");
+  return value.replace(/[\r\n]+/g, " ").replace(
+    /[<>]/g,
+    (character) => character === "<" ? "&lt;" : "&gt;",
+  ).replace(/([\\[\]*_#])/g, "\\$1");
 }
 
 function codeSpan(value: string): string {

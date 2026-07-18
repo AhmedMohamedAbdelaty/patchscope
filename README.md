@@ -2,7 +2,7 @@
 
 Patchscope reviews Git patches and public GitHub changes. It orders files with
 explained heuristics, turns them into a suggested review route, tracks progress
-locally, and exports a Markdown ledger.
+and private line findings locally, and exports a Markdown ledger.
 
 Live at
 [patchscope.ahmedmohamedabdelaty.deno.net](https://patchscope.ahmedmohamedabdelaty.deno.net).
@@ -16,6 +16,9 @@ Live at
 - Use Change Atlas to move through contracts, data, behavior, interface, tests,
   delivery, and low-signal artifacts with general, security, or test-first
   ordering. Its path-based route is guidance, not a dependency graph.
+- Add private concerns, questions, notes, and bookmarks to diff lines. Choose
+  which findings enter Markdown, or move review state in a metadata-only
+  `.patchscope.json` capsule.
 - Inputs are limited to 5 MiB, 2,000 files, and 100,000 review lines.
 - Private repositories, GitHub writes, accounts, AI review, and server-side
   patch storage are out of scope.
@@ -82,6 +85,7 @@ and the
 
 - `lib/diff/` owns parsing, priority signals, limits, and Markdown export.
 - `lib/client/` stores review progress in IndexedDB.
+- `lib/review/` validates portable, source-free review capsules.
 - `lib/server/` validates GitHub URLs, bounds provider reads, caches responses,
   and rate-limits imports.
 - `islands/ReviewWorkspace.tsx` coordinates the browser review loop.

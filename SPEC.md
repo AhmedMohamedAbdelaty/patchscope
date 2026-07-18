@@ -23,6 +23,11 @@ changed, where should I start, and what have I already checked?
   them.
 - Mark files viewed, resume local progress, jump to the next unreviewed file,
   and export a Markdown review summary.
+- Add private concerns, questions, notes, and bookmarks to an old or new line.
+  Findings remain in the browser and only explicitly included findings appear in
+  Markdown exports.
+- Export and restore a versioned review capsule containing progress, anchors,
+  and findings but no diff contents.
 - Explain every priority signal; never present heuristics as a security verdict.
 - Work with keyboard, touch, reduced motion, zoom, and narrow screens.
 
@@ -56,6 +61,13 @@ changed, where should I start, and what have I already checked?
     emphasize layers, but never silently reclassify a file.
 12. Selecting an atlas layer composes with text and noise filters, exposes a
     clear all-layers reset, and never changes document totals.
+13. A line finding records the file, old/new side, and line number; it can be
+    edited, removed, and excluded from Markdown without losing the draft.
+14. Findings survive reloads alongside file progress. Existing records created
+    before findings existed still load with an empty notebook.
+15. Review capsules are bounded, versioned, validated against the open change,
+    and rejected atomically when malformed, unsupported, or stale. They never
+    contain source or diff line contents.
 
 ## Architecture decisions
 
@@ -65,6 +77,9 @@ changed, where should I start, and what have I already checked?
   UI and storage do not import vendor types.
 - IndexedDB stores review sessions keyed by a SHA-256 digest. A small
   localStorage preference record stores display settings.
+- Notebook anchors use the immutable patch identity plus file identity, old/new
+  side, and line number. Revision-aware migration belongs to the revision model
+  rather than being guessed during import.
 - Change Atlas is an owned, dependency-free classifier over normalized file
   metadata. It returns a stable layer and a human-readable reason; the UI calls
   its output a suggestion rather than a dependency graph.

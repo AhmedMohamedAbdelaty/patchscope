@@ -27,6 +27,9 @@
   a linked repository. A checked-in GitHub Action now owns automatic deployment;
   it uses a scoped organization token and gates upload on test, check, and
   build.
+- 2026-07-18: Phase 2 rejects capsules from another document instead of trying
+  to match paths or nearby lines. Honest anchor migration requires the revision
+  model planned for Phase 3.
 
 ## Discovered edge cases
 
@@ -87,6 +90,20 @@
 - 2026-07-18: A linked Deno repository is not sufficient proof of automatic
   deployment. Two post-link pushes reached GitHub without enqueuing a revision,
   so the release contract now requires a green Action and changed health ID.
+- 2026-07-18: Reloading does not reopen a local patch because Patchscope does
+  not persist source contents. Reopening the same patch restores its notebook by
+  document digest; the browser test now exercises that exact boundary.
+- 2026-07-18: IndexedDB request success precedes transaction completion. Finding
+  mutations now await the committed transaction before the UI says they were
+  saved, so an immediate reload cannot race the write.
+- 2026-07-18: A unified context row defaults to its new-side coordinate. The
+  split view exposes separate old and new anchors when that distinction matters.
+- 2026-07-18: Removing an inline editor also removes its focused control. Focus
+  now returns to the exact annotation gutter or edited card instead of falling
+  back to the page's first link.
+- 2026-07-18: Two fast finding mutations can overlap before Preact rerenders.
+  Mutations now derive from a synchronous notebook reference, expose busy state,
+  and commit both changes without a last-write-wins loss.
 
 ## Questions for review
 
@@ -95,8 +112,9 @@
 
 ## Summary
 
-- Deviations recorded: 6; the latest uses an Action after native pushes failed.
+- Deviations recorded: 7; Phase 2 defers anchor migration to revision-aware
+  code.
 - Most revisitable decision: optional AI remains behind the evidence model.
-- Edge cases recorded: 18, including a linked repository with no push builds.
-- Next session should read `DEPLOYMENT.md` before changing release behavior.
-- Live proof requires a GitHub-triggered revision on the Production timeline.
+- Edge cases recorded: 23, including committed writes and concurrent findings.
+- Next session should read `SPEC.md` before changing notebook behavior.
+- Release proof requires a green Action and matching `/health` revision.

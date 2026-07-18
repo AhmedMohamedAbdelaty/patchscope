@@ -1,4 +1,4 @@
-import type { JSX } from "preact";
+import { Fragment, type JSX } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
   deleteReview,
@@ -24,6 +24,16 @@ import type {
   DiffLine,
   DiffSource,
 } from "../lib/diff/types.ts";
+import {
+  type FindingAnchor,
+  findingAnchorId,
+  type FindingKind,
+  MAX_CAPSULE_BYTES,
+  MAX_FINDING_BODY,
+  parseReviewCapsule,
+  type ReviewFinding,
+  serializeReviewCapsule,
+} from "../lib/review/notebook.ts";
 
 interface Props {
   sampleDiff: string;
@@ -33,6 +43,17 @@ type ViewStyle = "unified" | "split";
 type SortStyle = "priority" | "path";
 type Theme = "system" | "light" | "dark";
 type AtlasSelection = "all" | AtlasLayerId;
+type AddFinding = (
+  anchor: FindingAnchor,
+  kind: FindingKind,
+  body: string,
+  included: boolean,
+) => Promise<void>;
+type UpdateFinding = (
+  id: string,
+  changes: Pick<ReviewFinding, "kind" | "body" | "included">,
+) => Promise<void>;
+type RemoveFinding = (id: string) => Promise<void>;
 
 interface Filters {
   generated: boolean;
@@ -58,6 +79,8 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
   const [review, setReview] = useState<DiffDocument>();
   const [selectedId, setSelectedId] = useState<string>();
   const [viewed, setViewed] = useState<Set<string>>(new Set());
+  const [findings, setFindings] = useState<ReviewFinding[]>([]);
+  const [activeAnchor, setActiveAnchor] = useState<FindingAnchor>();
   const [viewStyle, setViewStyle] = useState<ViewStyle>("unified");
   const [wrap, setWrap] = useState(true);
   const [sortStyle, setSortStyle] = useState<SortStyle>("priority");
@@ -75,6 +98,8 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const capsuleRef = useRef<HTMLInputElement>(null);
+  const findingsRef = useRef<ReviewFinding[]>([]);
 
   const selected = review?.files.find((file) => file.id === selectedId) ??
     review?.files[0];
@@ -131,12 +156,15 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
     );
   }, [theme, viewStyle, wrap, reviewLens]);
 
+  useEffect(() => setActiveAnchor(undefined), [selectedId]);
+
   useEffect(() => {
     if (!review) return;
     saveReview({
       documentId: review.id,
       viewedFileIds: [...viewed],
       selectedFileId: selected?.id,
+      findings: findingsRef.current,
       updatedAt: new Date().toISOString(),
     }).catch(() =>
       setNotice("Review progress could not be saved in this browser.")
@@ -184,6 +212,8 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
       setReview(next);
       setAtlasLayer("all");
       setViewed(new Set(saved?.viewedFileIds ?? []));
+      replaceFindings(saved?.findings ?? []);
+      setActiveAnchor(undefined);
       setSelectedId(
         saved?.selectedFileId &&
           next.files.some((file) => file.id === saved.selectedFileId)
@@ -274,6 +304,8 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
     setReview(undefined);
     setSelectedId(undefined);
     setViewed(new Set());
+    replaceFindings([]);
+    setActiveAnchor(undefined);
     setCodeQuery("");
     setAtlasLayer("all");
     history.replaceState(null, "", location.pathname);
@@ -294,20 +326,153 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
 
   async function copySummary() {
     if (!review) return;
-    await navigator.clipboard.writeText(exportReview(review, viewed));
-    setNotice("Markdown review summary copied.");
+    try {
+      await navigator.clipboard.writeText(
+        exportReview(review, viewed, findings),
+      );
+      setNotice("Markdown review summary copied.");
+    } catch {
+      setError("Clipboard access failed. Download the Markdown file instead.");
+    }
   }
 
   function downloadSummary() {
     if (!review) return;
-    const blob = new Blob([exportReview(review, viewed)], {
-      type: "text/markdown;charset=utf-8",
-    });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `${slug(review.title)}-review.md`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+    downloadFile(
+      exportReview(review, viewed, findings),
+      `${slug(review.title)}-review.md`,
+      "text/markdown;charset=utf-8",
+    );
+  }
+
+  function downloadCapsule() {
+    if (!review) return;
+    downloadFile(
+      serializeReviewCapsule(review, {
+        viewedFileIds: [...viewed],
+        selectedFileId: selected?.id,
+        findings,
+      }),
+      `${slug(review.title)}-review.patchscope.json`,
+      "application/json;charset=utf-8",
+    );
+  }
+
+  async function importCapsule(file: File) {
+    if (!review) return;
+    setError("");
+    if (file.size > MAX_CAPSULE_BYTES) {
+      setError("Review capsule exceeds the 1 MiB limit.");
+      return;
+    }
+    try {
+      const restored = parseReviewCapsule(await file.text(), review);
+      const restoredSelected = restored.selectedFileId ?? selected?.id;
+      await saveReview({
+        documentId: review.id,
+        viewedFileIds: restored.viewedFileIds,
+        selectedFileId: restoredSelected,
+        findings: restored.findings,
+        updatedAt: new Date().toISOString(),
+      });
+      setViewed(new Set(restored.viewedFileIds));
+      replaceFindings(restored.findings);
+      setSelectedId(restoredSelected);
+      setActiveAnchor(undefined);
+      setNotice(
+        `Restored ${restored.findings.length} finding${
+          restored.findings.length === 1 ? "" : "s"
+        } from the review capsule.`,
+      );
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Review capsule could not be restored.",
+      );
+    }
+  }
+
+  async function addFinding(
+    anchor: FindingAnchor,
+    kind: FindingKind,
+    body: string,
+    included: boolean,
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    await commitFindings((current) => [...current, {
+      id: crypto.randomUUID(),
+      kind,
+      anchor,
+      body: body.trim(),
+      included,
+      createdAt: now,
+      updatedAt: now,
+    }]);
+    setActiveAnchor(undefined);
+    setNotice(`${findingLabel(kind)} saved privately.`);
+  }
+
+  async function updateFinding(
+    id: string,
+    changes: Pick<ReviewFinding, "kind" | "body" | "included">,
+  ): Promise<void> {
+    await commitFindings((current) =>
+      current.map((finding) =>
+        finding.id === id
+          ? {
+            ...finding,
+            ...changes,
+            body: changes.body.trim(),
+            updatedAt: new Date().toISOString(),
+          }
+          : finding
+      )
+    );
+    setNotice("Finding updated.");
+  }
+
+  async function removeFinding(id: string): Promise<void> {
+    await commitFindings((current) =>
+      current.filter((finding) => finding.id !== id)
+    );
+    setNotice("Finding removed.");
+  }
+
+  async function persistFindings(next: ReviewFinding[]): Promise<void> {
+    if (!review) return;
+    try {
+      await saveReview({
+        documentId: review.id,
+        viewedFileIds: [...viewed],
+        selectedFileId: selected?.id,
+        findings: next,
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (cause) {
+      setError("Finding could not be saved in this browser.");
+      throw cause;
+    }
+  }
+
+  async function commitFindings(
+    update: (current: ReviewFinding[]) => ReviewFinding[],
+  ): Promise<void> {
+    const previous = findingsRef.current;
+    const next = update(previous);
+    findingsRef.current = next;
+    try {
+      await persistFindings(next);
+      setFindings(next);
+    } catch (cause) {
+      if (findingsRef.current === next) findingsRef.current = previous;
+      throw cause;
+    }
+  }
+
+  function replaceFindings(next: ReviewFinding[]) {
+    findingsRef.current = next;
+    setFindings(next);
   }
 
   return (
@@ -365,6 +530,7 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
             <ReviewHeader
               review={review}
               viewed={reviewedCount}
+              findings={findings.length}
               onClose={closeReview}
             />
             <div class="review-grid">
@@ -376,6 +542,7 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
                 noiseHidden={noiseHidden}
                 selectedId={selected?.id}
                 viewed={viewed}
+                findings={findings}
                 query={fileQuery}
                 sortStyle={sortStyle}
                 filters={filters}
@@ -404,6 +571,10 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
                       onCopy={copySummary}
                       onDownload={downloadSummary}
                       onReset={resetProgress}
+                      findings={findings.length}
+                      capsuleRef={capsuleRef}
+                      onDownloadCapsule={downloadCapsule}
+                      onImportCapsule={importCapsule}
                     />
                     <DiffViewer
                       file={selected}
@@ -411,6 +582,14 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
                       style={viewStyle}
                       wrap={wrap}
                       query={codeQuery}
+                      findings={findings.filter((finding) =>
+                        finding.anchor.fileId === selected.id
+                      )}
+                      activeAnchor={activeAnchor}
+                      onActiveAnchor={setActiveAnchor}
+                      onAddFinding={addFinding}
+                      onUpdateFinding={updateFinding}
+                      onRemoveFinding={removeFinding}
                     />
                   </>
                 )}
@@ -566,9 +745,10 @@ function ImportDock({ loading, sampleDiff, onOpen, onGitHub }: {
 }
 
 function ReviewHeader(
-  { review, viewed, onClose }: {
+  { review, viewed, findings, onClose }: {
     review: DiffDocument;
     viewed: number;
+    findings: number;
     onClose: () => void;
   },
 ) {
@@ -609,6 +789,10 @@ function ReviewHeader(
           <dt>Reviewed</dt>
           <dd>{viewed}/{review.files.length}</dd>
         </div>
+        <div>
+          <dt>Findings</dt>
+          <dd>{findings}</dd>
+        </div>
       </dl>
       <div class="progress-block">
         <span>{progress}% complete</span>
@@ -626,6 +810,7 @@ function FileNavigator(props: {
   noiseHidden: number;
   selectedId?: string;
   viewed: ReadonlySet<string>;
+  findings: readonly ReviewFinding[];
   query: string;
   sortStyle: SortStyle;
   filters: Filters;
@@ -637,6 +822,7 @@ function FileNavigator(props: {
   onSelect: (id: string) => void;
 }) {
   const groups = groupFiles(props.files);
+  const findingCounts = countFindingsByFile(props.findings);
   return (
     <aside class="file-navigator" aria-label="Changed files">
       <div class="navigator-tools">
@@ -740,6 +926,18 @@ function FileNavigator(props: {
                     <span class="file-delta">
                       <span class="addition">+{file.additions}</span>
                       <span class="deletion">−{file.deletions}</span>
+                    </span>
+                    <span
+                      class="file-findings"
+                      data-empty={!findingCounts.get(file.id)}
+                      aria-label={findingCounts.get(file.id)
+                        ? `${findingCounts.get(file.id)} findings`
+                        : undefined}
+                      aria-hidden={findingCounts.get(file.id)
+                        ? undefined
+                        : "true"}
+                    >
+                      {findingCounts.get(file.id) ?? ""}
                     </span>
                     <span
                       class="priority-dot"
@@ -847,6 +1045,10 @@ function FileToolbar(props: {
   onCopy: () => void;
   onDownload: () => void;
   onReset: () => void;
+  findings: number;
+  capsuleRef: { current: HTMLInputElement | null };
+  onDownloadCapsule: () => void;
+  onImportCapsule: (file: File) => Promise<void>;
 }) {
   const classification = classifyFile(props.file);
   const route = atlasLayerDetails(classification.layer);
@@ -955,9 +1157,33 @@ function FileToolbar(props: {
             <button type="button" onClick={props.onDownload}>
               Download Markdown
             </button>
+            <button type="button" onClick={props.onDownloadCapsule}>
+              Download review capsule
+            </button>
+            <input
+              ref={props.capsuleRef}
+              class="visually-hidden"
+              type="file"
+              accept=".json,application/json"
+              aria-label="Choose a Patchscope review capsule"
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                if (file) void props.onImportCapsule(file);
+                event.currentTarget.value = "";
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => props.capsuleRef.current?.click()}
+            >
+              Restore review capsule
+            </button>
             <button type="button" onClick={props.onReset}>
               Clear review progress
             </button>
+            <small>
+              {props.findings} private finding{props.findings === 1 ? "" : "s"}
+            </small>
           </div>
         </details>
       </div>
@@ -966,12 +1192,30 @@ function FileToolbar(props: {
 }
 
 function DiffViewer(
-  { file, fileIndex, style, wrap, query }: {
+  {
+    file,
+    fileIndex,
+    style,
+    wrap,
+    query,
+    findings,
+    activeAnchor,
+    onActiveAnchor,
+    onAddFinding,
+    onUpdateFinding,
+    onRemoveFinding,
+  }: {
     file: DiffFile;
     fileIndex: number;
     style: ViewStyle;
     wrap: boolean;
     query: string;
+    findings: readonly ReviewFinding[];
+    activeAnchor?: FindingAnchor;
+    onActiveAnchor: (anchor?: FindingAnchor) => void;
+    onAddFinding: AddFinding;
+    onUpdateFinding: UpdateFinding;
+    onRemoveFinding: RemoveFinding;
   },
 ) {
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
@@ -1043,16 +1287,30 @@ function DiffViewer(
               ? (
                 <UnifiedRows
                   rows={rows}
+                  file={file}
                   fileIndex={fileIndex}
                   query={query}
+                  findings={findings}
+                  activeAnchor={activeAnchor}
+                  onActiveAnchor={onActiveAnchor}
+                  onAddFinding={onAddFinding}
+                  onUpdateFinding={onUpdateFinding}
+                  onRemoveFinding={onRemoveFinding}
                   onExpand={() => setExpanded(addToSet(expanded, hunkIndex))}
                 />
               )
               : (
                 <SplitRows
                   rows={splitRows(rows)}
+                  file={file}
                   fileIndex={fileIndex}
                   query={query}
+                  findings={findings}
+                  activeAnchor={activeAnchor}
+                  onActiveAnchor={onActiveAnchor}
+                  onAddFinding={onAddFinding}
+                  onUpdateFinding={onUpdateFinding}
+                  onRemoveFinding={onRemoveFinding}
                   onExpand={() => setExpanded(addToSet(expanded, hunkIndex))}
                 />
               )}
@@ -1085,10 +1343,29 @@ interface SplitRow {
 }
 
 function UnifiedRows(
-  { rows, fileIndex, query, onExpand }: {
+  {
+    rows,
+    file,
+    fileIndex,
+    query,
+    findings,
+    activeAnchor,
+    onActiveAnchor,
+    onAddFinding,
+    onUpdateFinding,
+    onRemoveFinding,
+    onExpand,
+  }: {
     rows: DisplayRow[];
+    file: DiffFile;
     fileIndex: number;
     query: string;
+    findings: readonly ReviewFinding[];
+    activeAnchor?: FindingAnchor;
+    onActiveAnchor: (anchor?: FindingAnchor) => void;
+    onAddFinding: AddFinding;
+    onUpdateFinding: UpdateFinding;
+    onRemoveFinding: RemoveFinding;
     onExpand: () => void;
   },
 ) {
@@ -1105,24 +1382,43 @@ function UnifiedRows(
           );
         }
         const anchor = lineAnchor(fileIndex, line);
+        const findingAnchor = lineFindingAnchor(file, line);
+        const lineFindings = findingsAt(findings, findingAnchor);
+        const isActive = sameAnchor(activeAnchor, findingAnchor);
         return (
-          <div
-            class="diff-line"
-            data-kind={line.kind}
-            id={anchor}
-            key={`${anchor}-${index}`}
-          >
-            <LineLink value={line.oldLine} anchor={anchor} label="Old line" />
-            <LineLink value={line.newLine} anchor={anchor} label="New line" />
-            <span class="line-sign" aria-hidden="true">
-              {line.kind === "addition"
-                ? "+"
-                : line.kind === "deletion"
-                ? "−"
-                : " "}
-            </span>
-            <code>{highlight(line.content, query)}</code>
-          </div>
+          <Fragment key={`${anchor}-${index}`}>
+            <div
+              class="diff-line"
+              data-kind={line.kind}
+              id={anchor}
+            >
+              <AnnotationButton
+                anchor={findingAnchor}
+                count={lineFindings.length}
+                active={isActive}
+                onClick={onActiveAnchor}
+              />
+              <LineLink value={line.oldLine} anchor={anchor} label="Old line" />
+              <LineLink value={line.newLine} anchor={anchor} label="New line" />
+              <span class="line-sign" aria-hidden="true">
+                {line.kind === "addition"
+                  ? "+"
+                  : line.kind === "deletion"
+                  ? "−"
+                  : " "}
+              </span>
+              <code>{highlight(line.content, query)}</code>
+            </div>
+            <LineNotebook
+              anchor={findingAnchor}
+              findings={lineFindings}
+              composing={isActive}
+              onCancel={() => onActiveAnchor(undefined)}
+              onAdd={onAddFinding}
+              onUpdate={onUpdateFinding}
+              onRemove={onRemoveFinding}
+            />
+          </Fragment>
         );
       })}
     </div>
@@ -1130,10 +1426,29 @@ function UnifiedRows(
 }
 
 function SplitRows(
-  { rows, fileIndex, query, onExpand }: {
+  {
+    rows,
+    file,
+    fileIndex,
+    query,
+    findings,
+    activeAnchor,
+    onActiveAnchor,
+    onAddFinding,
+    onUpdateFinding,
+    onRemoveFinding,
+    onExpand,
+  }: {
     rows: SplitRow[];
+    file: DiffFile;
     fileIndex: number;
     query: string;
+    findings: readonly ReviewFinding[];
+    activeAnchor?: FindingAnchor;
+    onActiveAnchor: (anchor?: FindingAnchor) => void;
+    onAddFinding: AddFinding;
+    onUpdateFinding: UpdateFinding;
+    onRemoveFinding: RemoveFinding;
     onExpand: () => void;
   },
 ) {
@@ -1145,21 +1460,51 @@ function SplitRows(
             <GapRow key={`gap-${index}`} count={row.gap} onExpand={onExpand} />
           );
         }
+        const leftAnchor = row.left
+          ? lineFindingAnchor(file, row.left, "old")
+          : undefined;
+        const rightAnchor = row.right
+          ? lineFindingAnchor(file, row.right, "new")
+          : undefined;
         return (
-          <div class="split-row" key={`${fileIndex}-${index}`}>
-            <SplitCell
-              line={row.left}
-              side="old"
-              fileIndex={fileIndex}
-              query={query}
-            />
-            <SplitCell
-              line={row.right}
-              side="new"
-              fileIndex={fileIndex}
-              query={query}
-            />
-          </div>
+          <Fragment key={`${fileIndex}-${index}`}>
+            <div class="split-row">
+              <SplitCell
+                line={row.left}
+                side="old"
+                fileIndex={fileIndex}
+                query={query}
+                findingAnchor={leftAnchor}
+                findingCount={findingsAt(findings, leftAnchor).length}
+                findingActive={sameAnchor(activeAnchor, leftAnchor)}
+                onActiveAnchor={onActiveAnchor}
+              />
+              <SplitCell
+                line={row.right}
+                side="new"
+                fileIndex={fileIndex}
+                query={query}
+                findingAnchor={rightAnchor}
+                findingCount={findingsAt(findings, rightAnchor).length}
+                findingActive={sameAnchor(activeAnchor, rightAnchor)}
+                onActiveAnchor={onActiveAnchor}
+              />
+            </div>
+            {[leftAnchor, rightAnchor].filter(
+              (anchor): anchor is FindingAnchor => Boolean(anchor),
+            ).map((anchor) => (
+              <LineNotebook
+                key={findingAnchorId(anchor)}
+                anchor={anchor}
+                findings={findingsAt(findings, anchor)}
+                composing={sameAnchor(activeAnchor, anchor)}
+                onCancel={() => onActiveAnchor(undefined)}
+                onAdd={onAddFinding}
+                onUpdate={onUpdateFinding}
+                onRemove={onRemoveFinding}
+              />
+            ))}
+          </Fragment>
         );
       })}
     </div>
@@ -1167,11 +1512,24 @@ function SplitRows(
 }
 
 function SplitCell(
-  { line, side, fileIndex, query }: {
+  {
+    line,
+    side,
+    fileIndex,
+    query,
+    findingAnchor,
+    findingCount,
+    findingActive,
+    onActiveAnchor,
+  }: {
     line?: DiffLine;
     side: "old" | "new";
     fileIndex: number;
     query: string;
+    findingAnchor?: FindingAnchor;
+    findingCount: number;
+    findingActive: boolean;
+    onActiveAnchor: (anchor?: FindingAnchor) => void;
   },
 ) {
   if (!line) return <div class="split-cell empty-cell" />;
@@ -1179,6 +1537,12 @@ function SplitCell(
   const value = side === "old" ? line.oldLine : line.newLine;
   return (
     <div class="split-cell" data-kind={line.kind} id={anchor}>
+      <AnnotationButton
+        anchor={findingAnchor}
+        count={findingCount}
+        active={findingActive}
+        onClick={onActiveAnchor}
+      />
       <LineLink value={value} anchor={anchor} label={`${side} line`} />
       <span class="line-sign" aria-hidden="true">
         {line.kind === "addition" ? "+" : line.kind === "deletion" ? "−" : " "}
@@ -1208,6 +1572,246 @@ function LineLink(
     >
       {value}
     </a>
+  );
+}
+
+function AnnotationButton(
+  { anchor, count, active, onClick }: {
+    anchor?: FindingAnchor;
+    count: number;
+    active: boolean;
+    onClick: (anchor?: FindingAnchor) => void;
+  },
+) {
+  if (!anchor) return <span class="annotation-gutter" />;
+  const location = `${anchor.side} line ${anchor.line}`;
+  return (
+    <button
+      class="annotation-button"
+      type="button"
+      data-has-findings={count > 0}
+      data-finding-anchor={findingAnchorId(anchor)}
+      aria-expanded={active}
+      aria-label={`${active ? "Close" : "Add"} private finding at ${location}`}
+      onClick={() => onClick(active ? undefined : anchor)}
+    >
+      {count > 0 ? count : "+"}
+    </button>
+  );
+}
+
+function LineNotebook(
+  { anchor, findings, composing, onCancel, onAdd, onUpdate, onRemove }: {
+    anchor?: FindingAnchor;
+    findings: readonly ReviewFinding[];
+    composing: boolean;
+    onCancel: () => void;
+    onAdd: AddFinding;
+    onUpdate: UpdateFinding;
+    onRemove: RemoveFinding;
+  },
+) {
+  if (!anchor || (!findings.length && !composing)) return null;
+  const restoreAnchorFocus = () => focusAnnotation(anchor);
+  return (
+    <section
+      class="line-notebook"
+      aria-label={`Private findings at ${anchor.side} line ${anchor.line}`}
+    >
+      <div class="notebook-location">
+        <span>{anchor.side === "old" ? "OLD" : "NEW"}</span>
+        <strong>Line {anchor.line}</strong>
+        <small>Private in this browser</small>
+      </div>
+      <div class="notebook-entries">
+        {findings.map((finding) => (
+          <FindingCard
+            key={finding.id}
+            finding={finding}
+            onUpdate={onUpdate}
+            onRemove={onRemove}
+          />
+        ))}
+        {composing && (
+          <FindingEditor
+            anchor={anchor}
+            onCancel={() => {
+              onCancel();
+              restoreAnchorFocus();
+            }}
+            onSave={async (...values) => {
+              await onAdd(...values);
+              restoreAnchorFocus();
+            }}
+          />
+        )}
+      </div>
+    </section>
+  );
+}
+
+function FindingEditor(
+  { anchor, initial, onCancel, onSave }: {
+    anchor: FindingAnchor;
+    initial?: ReviewFinding;
+    onCancel: () => void;
+    onSave: AddFinding;
+  },
+) {
+  const [kind, setKind] = useState<FindingKind>(initial?.kind ?? "note");
+  const [body, setBody] = useState(initial?.body ?? "");
+  const [included, setIncluded] = useState(initial?.included ?? true);
+  const [saving, setSaving] = useState(false);
+  const valid = kind === "bookmark" || body.trim().length > 0;
+  return (
+    <form
+      class="finding-editor"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (!valid || saving) return;
+        setSaving(true);
+        try {
+          await onSave(anchor, kind, body, included);
+        } catch {
+          setSaving(false);
+        }
+      }}
+    >
+      <div class="finding-fields">
+        <label>
+          <span>Type</span>
+          <select
+            value={kind}
+            onChange={(event) =>
+              setKind(event.currentTarget.value as FindingKind)}
+          >
+            <option value="concern">Concern</option>
+            <option value="question">Question</option>
+            <option value="note">Note</option>
+            <option value="bookmark">Bookmark</option>
+          </select>
+        </label>
+        <label class="export-choice">
+          <input
+            type="checkbox"
+            checked={included}
+            onChange={(event) => setIncluded(event.currentTarget.checked)}
+          />
+          Include in Markdown
+        </label>
+      </div>
+      <label class="finding-body">
+        <span>{kind === "bookmark" ? "Label (optional)" : "Finding"}</span>
+        <textarea
+          autoFocus
+          rows={3}
+          maxLength={MAX_FINDING_BODY}
+          value={body}
+          placeholder={findingPlaceholder(kind)}
+          onInput={(event) => setBody(event.currentTarget.value)}
+        />
+      </label>
+      <div class="finding-actions">
+        <button type="button" disabled={saving} onClick={onCancel}>
+          Cancel
+        </button>
+        <button
+          class="save-finding"
+          type="submit"
+          disabled={!valid || saving}
+        >
+          {saving ? "Saving…" : "Save privately"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function FindingCard(
+  { finding, onUpdate, onRemove }: {
+    finding: ReviewFinding;
+    onUpdate: UpdateFinding;
+    onRemove: RemoveFinding;
+  },
+) {
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const restoreCardFocus = () => focusFindingCard(finding.id);
+  if (editing) {
+    return (
+      <FindingEditor
+        anchor={finding.anchor}
+        initial={finding}
+        onCancel={() => {
+          setEditing(false);
+          restoreCardFocus();
+        }}
+        onSave={async (_, kind, body, included) => {
+          await onUpdate(finding.id, { kind, body, included });
+          setEditing(false);
+          restoreCardFocus();
+        }}
+      />
+    );
+  }
+  return (
+    <article
+      class="finding-card"
+      data-kind={finding.kind}
+      data-finding-id={finding.id}
+      aria-busy={busy}
+    >
+      <div class="finding-card-heading">
+        <strong>{findingLabel(finding.kind)}</strong>
+        <label class="export-choice">
+          <input
+            type="checkbox"
+            checked={finding.included}
+            disabled={busy}
+            onChange={async (event) => {
+              const input = event.currentTarget;
+              setBusy(true);
+              try {
+                await onUpdate(finding.id, {
+                  kind: finding.kind,
+                  body: finding.body,
+                  included: input.checked,
+                });
+              } catch {
+                input.focus();
+              } finally {
+                setBusy(false);
+              }
+            }}
+          />
+          Markdown
+        </label>
+      </div>
+      <p>{finding.body || "Bookmark"}</p>
+      <div class="finding-card-actions">
+        <button type="button" disabled={busy} onClick={() => setEditing(true)}>
+          Edit
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={async (event) => {
+            const button = event.currentTarget;
+            setBusy(true);
+            try {
+              await onRemove(finding.id);
+              focusAnnotation(finding.anchor);
+            } catch {
+              button.focus();
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          Remove
+        </button>
+      </div>
+    </article>
   );
 }
 
@@ -1372,6 +1976,92 @@ function lineAnchor(
   return `F${fileIndex + 1}-${
     side === "old" ? "L" : side === "new" ? "R" : side
   }${value ?? 0}`;
+}
+
+function lineFindingAnchor(
+  file: DiffFile,
+  line: DiffLine,
+  preferred?: "old" | "new",
+): FindingAnchor | undefined {
+  const side = preferred ?? (line.newLine != null ? "new" : "old");
+  const value = side === "old" ? line.oldLine : line.newLine;
+  return value == null
+    ? undefined
+    : { fileId: file.id, filePath: file.path, side, line: value };
+}
+
+function findingsAt(
+  findings: readonly ReviewFinding[],
+  anchor?: FindingAnchor,
+): ReviewFinding[] {
+  if (!anchor) return [];
+  const id = findingAnchorId(anchor);
+  return findings.filter((finding) => findingAnchorId(finding.anchor) === id);
+}
+
+function sameAnchor(
+  left?: FindingAnchor,
+  right?: FindingAnchor,
+): boolean {
+  return Boolean(
+    left && right && findingAnchorId(left) === findingAnchorId(right),
+  );
+}
+
+function focusAnnotation(anchor: FindingAnchor) {
+  const id = findingAnchorId(anchor);
+  requestAnimationFrame(() => {
+    const button = [...document.querySelectorAll<HTMLButtonElement>(
+      ".annotation-button",
+    )].find((candidate) => candidate.dataset.findingAnchor === id);
+    button?.focus();
+  });
+}
+
+function focusFindingCard(id: string) {
+  requestAnimationFrame(() => {
+    const card = [...document.querySelectorAll<HTMLElement>(".finding-card")]
+      .find((candidate) => candidate.dataset.findingId === id);
+    card?.querySelector<HTMLButtonElement>("button")?.focus();
+  });
+}
+
+function countFindingsByFile(
+  findings: readonly ReviewFinding[],
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const finding of findings) {
+    counts.set(
+      finding.anchor.fileId,
+      (counts.get(finding.anchor.fileId) ?? 0) + 1,
+    );
+  }
+  return counts;
+}
+
+function findingLabel(kind: FindingKind): string {
+  return kind[0].toUpperCase() + kind.slice(1);
+}
+
+function findingPlaceholder(kind: FindingKind): string {
+  switch (kind) {
+    case "concern":
+      return "What could break, leak, or behave unexpectedly?";
+    case "question":
+      return "What needs an answer before approval?";
+    case "note":
+      return "Record context for the rest of this review.";
+    case "bookmark":
+      return "Why return to this line?";
+  }
+}
+
+function downloadFile(contents: string, name: string, type: string) {
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([contents], { type }));
+  link.download = name;
+  link.click();
+  URL.revokeObjectURL(link.href);
 }
 
 function groupFiles(files: DiffFile[]): Array<[string, DiffFile[]]> {
