@@ -1,7 +1,8 @@
 # Patchscope
 
 Patchscope reviews Git patches and public GitHub changes. It orders files with
-explained heuristics, tracks progress locally, and exports a Markdown ledger.
+explained heuristics, turns them into a suggested review route, tracks progress
+locally, and exports a Markdown ledger.
 
 Live at
 [patchscope.ahmedmohamedabdelaty.deno.net](https://patchscope.ahmedmohamedabdelaty.deno.net).
@@ -12,6 +13,9 @@ Live at
   leaves the browser.
 - Import public GitHub commits, pull requests, and compares. The server accepts
   GitHub URLs only and keeps a short ETag cache.
+- Use Change Atlas to move through contracts, data, behavior, interface, tests,
+  delivery, and low-signal artifacts with general, security, or test-first
+  ordering. Its path-based route is guidance, not a dependency graph.
 - Inputs are limited to 5 MiB, 2,000 files, and 100,000 review lines.
 - Private repositories, GitHub writes, accounts, AI review, and server-side
   patch storage are out of scope.
@@ -62,6 +66,12 @@ deno deploy create \
   --region global
 ```
 
+After the app exists, publish a tested local checkout with:
+
+```sh
+deno deploy . --org ahmedmohamedabdelaty --app patchscope --prod
+```
+
 Use the new platform, not Deploy Classic. Deno documents the current flow in
 [Getting started](https://docs.deno.com/deploy/getting_started/),
 [Fresh framework support](https://docs.deno.com/deploy/reference/frameworks/#fresh-fresh),
@@ -79,3 +89,9 @@ and the
 
 Priority scores choose a review order. They do not claim that a file is
 vulnerable, correct, or safe.
+
+See [PRODUCT.md](./PRODUCT.md) for the product principles and
+[ROADMAP.md](./ROADMAP.md) for the independently shippable phases. The source
+notes and product implications are recorded in [RESEARCH.md](./RESEARCH.md). The
+app, revision, timeline, secret, and rollback model is explained in
+[DEPLOYMENT.md](./DEPLOYMENT.md).

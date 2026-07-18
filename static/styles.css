@@ -624,8 +624,115 @@ progress::-moz-progress-bar {
 }
 
 .navigator-tools {
+  min-width: 0;
   padding: 12px;
   border-bottom: 1px solid var(--line);
+}
+
+.change-atlas {
+  min-width: 0;
+  max-width: 100%;
+  margin: -1px -1px 12px;
+  padding: 0 1px 11px;
+  border-bottom: 1px solid var(--line);
+}
+
+.atlas-heading {
+  min-width: 0;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.atlas-heading .eyebrow {
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+}
+
+.atlas-heading h2 {
+  margin: 2px 0 0;
+  font-size: 0.91rem;
+  letter-spacing: -0.015em;
+}
+
+.atlas-heading select {
+  max-width: 92px;
+  padding: 4px 5px;
+  border: 1px solid var(--line);
+  background: var(--canvas);
+  color: var(--ink-soft);
+  font-size: 0.68rem;
+}
+
+.atlas-route {
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 1px 1px 6px;
+  overflow-x: auto;
+  list-style: none;
+  scrollbar-color: var(--line-strong) transparent;
+  scrollbar-width: thin;
+  scroll-snap-type: x proximity;
+}
+
+.atlas-route button {
+  width: 124px;
+  min-height: 43px;
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 5px 7px;
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  text-align: left;
+  scroll-snap-align: start;
+}
+
+.atlas-route button:hover {
+  border-color: var(--line-strong);
+}
+
+.atlas-route button[data-active="true"] {
+  border-color: var(--accent-strong);
+  background: var(--accent-wash);
+}
+
+.atlas-step {
+  color: var(--accent-strong);
+  font: 0.67rem var(--code);
+}
+
+.atlas-route strong,
+.atlas-route small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlas-route strong {
+  font-size: 0.7rem;
+  font-weight: 680;
+}
+
+.atlas-route small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.61rem;
+}
+
+.atlas-explanation {
+  min-height: 2.5em;
+  margin: 2px 1px 0;
+  color: var(--muted);
+  font-size: 0.65rem;
+  line-height: 1.25;
 }
 
 .search-field {

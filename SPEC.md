@@ -15,6 +15,8 @@ changed, where should I start, and what have I already checked?
 - Import a public GitHub commit, pull request, or compare URL through a
   server-side allowlisted adapter.
 - Browse files by path or review priority.
+- Follow a conservative suggested route through change-purpose layers, with
+  general, security, and test-focused lenses.
 - Review a selected file in unified or split form, wrap long lines, search
   within changes, and link to a line.
 - Hide lockfiles, generated files, and whitespace-only files without discarding
@@ -29,6 +31,7 @@ changed, where should I start, and what have I already checked?
 - GitHub write access, private repositories, accounts, comments posted to a
   provider, arbitrary URL fetching, AI review, or server-side patch persistence.
 - Claims that a change is safe, correct, or vulnerable.
+- Claims that path-based layers represent runtime or dependency relationships.
 
 ## Acceptance criteria
 
@@ -49,6 +52,10 @@ changed, where should I start, and what have I already checked?
 9. `deno task check`, `deno task test`, and `deno task build` pass.
 10. The production artifact follows the current Fresh-on-Deno-Deploy integrated
     build contract.
+11. Every file belongs to one stable Change Atlas layer. Lenses may reorder or
+    emphasize layers, but never silently reclassify a file.
+12. Selecting an atlas layer composes with text and noise filters, exposes a
+    clear all-layers reset, and never changes document totals.
 
 ## Architecture decisions
 
@@ -58,6 +65,9 @@ changed, where should I start, and what have I already checked?
   UI and storage do not import vendor types.
 - IndexedDB stores review sessions keyed by a SHA-256 digest. A small
   localStorage preference record stores display settings.
+- Change Atlas is an owned, dependency-free classifier over normalized file
+  metadata. It returns a stable layer and a human-readable reason; the UI calls
+  its output a suggestion rather than a dependency graph.
 - `/api/github` accepts only a normalized GitHub URL. It builds GitHub REST
   endpoints internally and returns raw diff text with source metadata.
 - In-memory cache entries store ETag, payload, and expiry only. Patches are

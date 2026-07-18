@@ -5,6 +5,15 @@ import {
   loadReview,
   saveReview,
 } from "../lib/client/review-store.ts";
+import {
+  type AtlasLayer,
+  atlasLayerDetails,
+  type AtlasLayerId,
+  buildAtlas,
+  classifyFile,
+  isReviewLens,
+  type ReviewLens,
+} from "../lib/diff/atlas.ts";
 import { exportReview } from "../lib/diff/export.ts";
 import { parseDiff } from "../lib/diff/parse.ts";
 import { priorityLabel } from "../lib/diff/priority.ts";
@@ -23,6 +32,7 @@ interface Props {
 type ViewStyle = "unified" | "split";
 type SortStyle = "priority" | "path";
 type Theme = "system" | "light" | "dark";
+type AtlasSelection = "all" | AtlasLayerId;
 
 interface Filters {
   generated: boolean;
@@ -51,6 +61,8 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
   const [viewStyle, setViewStyle] = useState<ViewStyle>("unified");
   const [wrap, setWrap] = useState(true);
   const [sortStyle, setSortStyle] = useState<SortStyle>("priority");
+  const [reviewLens, setReviewLens] = useState<ReviewLens>("general");
+  const [atlasLayer, setAtlasLayer] = useState<AtlasSelection>("all");
   const [filters, setFilters] = useState<Filters>({
     generated: true,
     lockfiles: true,
@@ -66,10 +78,21 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
 
   const selected = review?.files.find((file) => file.id === selectedId) ??
     review?.files[0];
-  const visibleFiles = useMemo(
-    () => filterAndSort(review?.files ?? [], filters, fileQuery, sortStyle),
-    [review, filters, fileQuery, sortStyle],
+  const atlas = useMemo(
+    () => buildAtlas(review?.files ?? [], reviewLens),
+    [review, reviewLens],
   );
+  const visibleFiles = useMemo(() => {
+    const files = filterAndSort(
+      review?.files ?? [],
+      filters,
+      fileQuery,
+      sortStyle,
+    );
+    return atlasLayer === "all"
+      ? files
+      : files.filter((file) => classifyFile(file).layer === atlasLayer);
+  }, [review, filters, fileQuery, sortStyle, atlasLayer]);
   const noiseHidden = useMemo(
     () =>
       (review?.files.length ?? 0) -
@@ -87,10 +110,14 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
         theme?: Theme;
         viewStyle?: ViewStyle;
         wrap?: boolean;
+        reviewLens?: ReviewLens;
       };
       if (preferences.theme) setTheme(preferences.theme);
       if (preferences.viewStyle) setViewStyle(preferences.viewStyle);
       if (typeof preferences.wrap === "boolean") setWrap(preferences.wrap);
+      if (isReviewLens(preferences.reviewLens)) {
+        setReviewLens(preferences.reviewLens);
+      }
     } catch {
       localStorage.removeItem("patchscope:preferences");
     }
@@ -100,9 +127,9 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem(
       "patchscope:preferences",
-      JSON.stringify({ theme, viewStyle, wrap }),
+      JSON.stringify({ theme, viewStyle, wrap, reviewLens }),
     );
-  }, [theme, viewStyle, wrap]);
+  }, [theme, viewStyle, wrap, reviewLens]);
 
   useEffect(() => {
     if (!review) return;
@@ -155,6 +182,7 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
       const next = await parseDiff(raw, source, title);
       const saved = await loadReview(next.id).catch(() => undefined);
       setReview(next);
+      setAtlasLayer("all");
       setViewed(new Set(saved?.viewedFileIds ?? []));
       setSelectedId(
         saved?.selectedFileId &&
@@ -223,7 +251,9 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
 
   function nextUnreviewed() {
     if (!review) return;
-    const ordered = filterAndSort(review.files, filters, "", sortStyle);
+    const ordered = filterAndSort(review.files, filters, "", sortStyle).filter(
+      (file) => atlasLayer === "all" || classifyFile(file).layer === atlasLayer,
+    );
     const currentIndex = ordered.findIndex((file) => file.id === selected?.id);
     const next = [
       ...ordered.slice(currentIndex + 1),
@@ -245,7 +275,21 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
     setSelectedId(undefined);
     setViewed(new Set());
     setCodeQuery("");
+    setAtlasLayer("all");
     history.replaceState(null, "", location.pathname);
+  }
+
+  function selectAtlasLayer(layer: AtlasSelection) {
+    setAtlasLayer(layer);
+    if (!review || layer === "all") return;
+    if (selected && classifyFile(selected).layer === layer) return;
+    const next = filterAndSort(
+      review.files.filter((file) => classifyFile(file).layer === layer),
+      filters,
+      fileQuery,
+      sortStyle,
+    )[0] ?? review.files.find((file) => classifyFile(file).layer === layer);
+    if (next) setSelectedId(next.id);
   }
 
   async function copySummary() {
@@ -326,6 +370,9 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
             <div class="review-grid">
               <FileNavigator
                 files={visibleFiles}
+                atlas={atlas}
+                atlasLayer={atlasLayer}
+                reviewLens={reviewLens}
                 noiseHidden={noiseHidden}
                 selectedId={selected?.id}
                 viewed={viewed}
@@ -335,6 +382,8 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
                 onQuery={setFileQuery}
                 onSort={setSortStyle}
                 onFilters={setFilters}
+                onAtlasLayer={selectAtlasLayer}
+                onReviewLens={setReviewLens}
                 onSelect={setSelectedId}
               />
               <section class="review-canvas" aria-label="Selected file review">
@@ -401,7 +450,7 @@ function ImportDock({ loading, sampleDiff, onOpen, onGitHub }: {
         <h1 id="intro-title">A map for the patch in front of you.</h1>
         <p>
           Open a diff, start with the consequential files, and leave with a
-          review ledger—not another tab you have to remember.
+          review ledger, not another tab you have to remember.
         </p>
         <ul class="trust-list">
           <li>
@@ -571,6 +620,9 @@ function ReviewHeader(
 
 function FileNavigator(props: {
   files: DiffFile[];
+  atlas: AtlasLayer[];
+  atlasLayer: AtlasSelection;
+  reviewLens: ReviewLens;
   noiseHidden: number;
   selectedId?: string;
   viewed: ReadonlySet<string>;
@@ -580,12 +632,21 @@ function FileNavigator(props: {
   onQuery: (value: string) => void;
   onSort: (value: SortStyle) => void;
   onFilters: (value: Filters) => void;
+  onAtlasLayer: (value: AtlasSelection) => void;
+  onReviewLens: (value: ReviewLens) => void;
   onSelect: (id: string) => void;
 }) {
   const groups = groupFiles(props.files);
   return (
     <aside class="file-navigator" aria-label="Changed files">
       <div class="navigator-tools">
+        <ChangeAtlas
+          layers={props.atlas}
+          selected={props.atlasLayer}
+          lens={props.reviewLens}
+          onLayer={props.onAtlasLayer}
+          onLens={props.onReviewLens}
+        />
         <label class="search-field">
           <SearchIcon />
           <span class="visually-hidden">Filter changed files</span>
@@ -698,6 +759,79 @@ function FileNavigator(props: {
   );
 }
 
+function ChangeAtlas(props: {
+  layers: AtlasLayer[];
+  selected: AtlasSelection;
+  lens: ReviewLens;
+  onLayer: (value: AtlasSelection) => void;
+  onLens: (value: ReviewLens) => void;
+}) {
+  const selected = props.layers.find((layer) => layer.id === props.selected);
+  return (
+    <section class="change-atlas" aria-labelledby="atlas-title">
+      <div class="atlas-heading">
+        <div>
+          <span class="eyebrow">SUGGESTED ROUTE</span>
+          <h2 id="atlas-title">Change Atlas</h2>
+        </div>
+        <label>
+          <span class="visually-hidden">Review lens</span>
+          <select
+            value={props.lens}
+            onChange={(event) =>
+              props.onLens(event.currentTarget.value as ReviewLens)}
+          >
+            <option value="general">General</option>
+            <option value="security">Security</option>
+            <option value="tests">Tests first</option>
+          </select>
+        </label>
+      </div>
+      <ol class="atlas-route" aria-label="Suggested review layers">
+        <li>
+          <button
+            type="button"
+            data-active={props.selected === "all"}
+            aria-pressed={props.selected === "all"}
+            onClick={() => props.onLayer("all")}
+          >
+            <span class="atlas-step">00</span>
+            <span>
+              <strong>All files</strong>
+              <small>Full change</small>
+            </span>
+          </button>
+        </li>
+        {props.layers.map((layer, index) => (
+          <li key={layer.id}>
+            <button
+              type="button"
+              data-active={props.selected === layer.id}
+              aria-pressed={props.selected === layer.id}
+              title={layer.description}
+              onClick={() => props.onLayer(layer.id)}
+            >
+              <span class="atlas-step">
+                {String(index + 1).padStart(2, "0")}
+              </span>
+              <span>
+                <strong>{layer.title}</strong>
+                <small>
+                  {layer.files.length} file{layer.files.length === 1 ? "" : "s"}
+                </small>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ol>
+      <p class="atlas-explanation" aria-live="polite">
+        {selected?.description ??
+          "A path-based starting point, not a dependency graph."}
+      </p>
+    </section>
+  );
+}
+
 function FileToolbar(props: {
   file: DiffFile;
   reviewed: boolean;
@@ -714,6 +848,8 @@ function FileToolbar(props: {
   onDownload: () => void;
   onReset: () => void;
 }) {
+  const classification = classifyFile(props.file);
+  const route = atlasLayerDetails(classification.layer);
   return (
     <header class="file-toolbar">
       <div class="file-title-row">
@@ -736,6 +872,9 @@ function FileToolbar(props: {
           </summary>
           <div class="priority-panel">
             <strong>Why this order?</strong>
+            <p>
+              Atlas: {route.title}. {classification.reason}.
+            </p>
             {props.file.prioritySignals.length
               ? (
                 <ul>

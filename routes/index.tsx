@@ -7,7 +7,7 @@ export default define.page(function Home() {
   return (
     <>
       <Head>
-        <title>Patchscope — review the change, not the noise</title>
+        <title>Patchscope: review the change, not the noise</title>
         <meta
           name="description"
           content="A local-first workspace for reviewing patches and public GitHub changes in a deliberate order."

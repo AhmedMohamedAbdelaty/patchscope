@@ -29,7 +29,7 @@ export function exportReview(
     "",
     ...(remaining.length
       ? remaining.map((file) =>
-        `- [ ] ${codeSpan(file.path)} — ${
+        `- [ ] ${codeSpan(file.path)}: ${
           priorityLabel(file.priority)
         } (+${file.additions} −${file.deletions})`
       )

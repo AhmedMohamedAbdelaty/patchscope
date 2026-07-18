@@ -2,6 +2,15 @@
 
 ## Deviations
 
+- 2026-07-18: Product research moved optional AI behind orientation, private
+  reasoning, and revision-aware review. Diff-only AI benchmarks and practitioner
+  feedback do not support presenting automated findings as the first or primary
+  product value.
+- 2026-07-18: Phase 1 uses conservative path and file metadata classification
+  instead of AST or import-graph analysis. The interface calls the result a
+  suggested route and exposes its reason so it cannot be mistaken for a proven
+  dependency graph.
+
 - 2026-07-18: Chose a small parser adapter around `gitdiff-parser` instead of
   the richer `@pierre/diffs` renderer. The richer package pulls a large
   syntax-highlighting and React-oriented graph into the client. Patchscope needs
@@ -12,6 +21,17 @@
   `?github=` auto-import remain; a browser extension is the honest upgrade path.
 
 ## Discovered edge cases
+
+- 2026-07-18: One file can plausibly fit several review purposes. Change Atlas
+  therefore uses a documented first-match precedence and keeps classification
+  stable while review lenses only change ordering.
+- 2026-07-18: The first browser pass found that the horizontal route's intrinsic
+  width pushed the lens selector outside a narrow navigator. Explicit zero
+  minimum widths now keep route scrolling local; the page remains 390 CSS pixels
+  wide in the automated browser check.
+- 2026-07-18: Test naming is ecosystem-specific. The classifier covers test
+  directories, `.test`/`.spec`, Deno and Go-style `_test`, and root-level
+  `test_`/`spec_` filenames without treating every source suffix as a test.
 
 - 2026-07-18: GitHub diff responses can omit textual hunks for binary files and
   can fail for very large diffs. The import boundary needs explicit binary and
@@ -58,9 +78,9 @@
 
 ## Summary
 
-- Built the complete local-first review workspace and public GitHub adapter.
-- Kept the client bundle small by owning the renderer and limiting visible rows.
-- Verified parsing, provider errors, rate limits, export safety, and
-  persistence.
-- Verified light, dark, 320 px, keyboard, live GitHub, and production CSP paths.
-- Published from a clean Git repository to the new Deno Deploy platform.
+- Kept the local-first review workspace and public GitHub boundary intact.
+- Added a dependency-free Change Atlas with stable, explained file layers.
+- Added general, security, and test-first routes without changing
+  classification.
+- Verified classification, filtering, keyboard flow, 390 px layout, and themes.
+- Recorded later notebook, revision, integration, AI, team, and theme phases.
