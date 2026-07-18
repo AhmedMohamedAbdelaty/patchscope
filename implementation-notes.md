@@ -23,6 +23,10 @@
   had no GitHub source. The app is now linked to
   `AhmedMohamedAbdelaty/patchscope`; the CLI remains a recovery path rather than
   the normal release mechanism.
+- 2026-07-18: Two pushes produced no Deno revision despite the dashboard showing
+  a linked repository. A checked-in GitHub Action now owns automatic deployment;
+  it uses a scoped organization token and gates upload on test, check, and
+  build.
 
 ## Discovered edge cases
 
@@ -80,6 +84,9 @@
 - 2026-07-18: The Deno Deploy CLI appends a blank line to `deno.json` even for a
   read-only revision listing. Remove that formatting-only mutation before
   committing so deployment diagnostics do not create unrelated config churn.
+- 2026-07-18: A linked Deno repository is not sufficient proof of automatic
+  deployment. Two post-link pushes reached GitHub without enqueuing a revision,
+  so the release contract now requires a green Action and changed health ID.
 
 ## Questions for review
 
@@ -88,9 +95,8 @@
 
 ## Summary
 
-- Deviations recorded: 5; the latest replaces manual releases with GitHub
-  builds.
+- Deviations recorded: 6; the latest uses an Action after native pushes failed.
 - Most revisitable decision: optional AI remains behind the evidence model.
-- Edge cases recorded: 17, including local deploys not creating a source link.
+- Edge cases recorded: 18, including a linked repository with no push builds.
 - Next session should read `DEPLOYMENT.md` before changing release behavior.
 - Live proof requires a GitHub-triggered revision on the Production timeline.

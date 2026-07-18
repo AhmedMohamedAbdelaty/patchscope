@@ -13,14 +13,19 @@ does not require rebuilding old code.
 ## Current Patchscope flow
 
 ```text
-local commit -> GitHub push -> Deno GitHub integration -> revision -> timeline
+local commit -> GitHub Actions checks -> deno deploy CLI -> revision -> timeline
 ```
 
-The Deno app is linked to `AhmedMohamedAbdelaty/patchscope`. Each push creates a
-revision automatically. The default branch routes successful builds to the
-Production timeline; other branches receive branch and preview URLs.
+The Deno app is linked to `AhmedMohamedAbdelaty/patchscope`, but the native push
+hook did not enqueue revisions during live verification. The checked-in GitHub
+Actions workflow is the authoritative release path. Every push runs tests,
+checks, and a production build before it can deploy.
 
-The CLI remains a recovery path for deliberate manual redeployment:
+Pushes to `main` route successful revisions to Production. Other branches create
+preview revisions without changing production traffic. Both paths use the same
+CLI and build configuration.
+
+The CLI also remains a recovery path for deliberate manual redeployment:
 
 ```sh
 deno deploy . \
@@ -29,8 +34,8 @@ deno deploy . \
   --prod
 ```
 
-Normal releases do not run that command. Test, commit, and push; Deno checks out
-the GitHub commit, builds it, and routes it only after every build stage passes.
+Normal releases do not run that command locally. Test, commit, and push; the
+Action uploads the checked-out commit after its verification gates pass.
 
 ## What the build screen means
 
@@ -52,6 +57,10 @@ successfully.
 dashboard currently supplies the build commands and 3 GiB build-memory setting.
 The runtime uses its separate 768 MiB default memory limit.
 
+GitHub Actions stores a scoped Deno organization token as the encrypted
+`DENO_DEPLOY_TOKEN` repository secret. The workflow fails before upload if that
+secret is absent.
+
 `GITHUB_TOKEN` is optional. If added, store it as a secret in the Production and
 Development contexts, never in the repository:
 
@@ -71,12 +80,13 @@ deno task test
 deno task check
 deno task build
 git push origin main
+gh run watch --exit-status
 curl -fsS https://patchscope.ahmedmohamedabdelaty.deno.net/health
 ```
 
 The health response exposes `DENO_DEPLOY_BUILD_ID`, so the deployed revision can
-be matched to the GitHub-triggered build. A failed build never receives
-production traffic. Deno's build page records the source commit and trigger.
+be matched to the Action output. A failed verification or Deno build never
+receives production traffic.
 
 Current platform references:
 

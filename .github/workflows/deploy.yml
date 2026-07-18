@@ -1,0 +1,45 @@
+name: Verify and deploy
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deno-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DENO_DEPLOY_TOKEN: ${{ secrets.DENO_DEPLOY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.3
+      - name: Install dependencies
+        run: deno install --frozen
+      - name: Test
+        run: deno task test
+      - name: Check
+        run: deno task check
+      - name: Build
+        run: deno task build
+      - name: Require deployment token
+        run: test -n "$DENO_DEPLOY_TOKEN"
+      - name: Deploy revision
+        env:
+          DEFAULT_BRANCH: main
+        run: |
+          if [ "$GITHUB_REF_NAME" = "$DEFAULT_BRANCH" ]; then
+            deno deploy . --org ahmedmohamedabdelaty --app patchscope \
+              --prod --json --non-interactive
+          else
+            deno deploy . --org ahmedmohamedabdelaty --app patchscope \
+              --json --non-interactive
+          fi
