@@ -55,7 +55,7 @@ deno deploy create \
   --source local \
   --framework-preset fresh \
   --build-timeout 5 \
-  --build-memory-limit 1024 \
+  --build-memory-limit 3072 \
   --region global
 ```
 

@@ -44,6 +44,9 @@
   as its checked-in application context. A framework-only `deploy` object is
   valid build configuration but cannot be published locally until those fields
   identify the target app.
+- 2026-07-18: Creating the app with a 1 GiB build-memory override let Vite
+  finish but failed Deno's Fresh artifact finalization. The deployment now uses
+  the platform's 3 GiB default instead of carrying that artificial constraint.
 
 ## Questions for review
 
