@@ -19,6 +19,10 @@
 - 2026-07-18: Dropped the planned bookmarklet after a live test showed GitHub's
   Content Security Policy blocks `javascript:` bookmarks. Direct URL import and
   `?github=` auto-import remain; a browser extension is the honest upgrade path.
+- 2026-07-18: Initial releases used local CLI uploads because the existing app
+  had no GitHub source. The app is now linked to
+  `AhmedMohamedAbdelaty/patchscope`; the CLI remains a recovery path rather than
+  the normal release mechanism.
 
 ## Discovered edge cases
 
@@ -70,6 +74,9 @@
 - 2026-07-18: The new platform exposes `DENO_DEPLOY=true` and identifies the
   active revision through `DENO_DEPLOY_BUILD_ID`. Production smoke testing
   caught the older value check and revision variable before handoff.
+- 2026-07-18: Deploying local source does not link an existing app to GitHub.
+  Repository linking is an App Settings operation; its proof is a new build with
+  GitHub source metadata triggered by a push.
 
 ## Questions for review
 
@@ -78,9 +85,9 @@
 
 ## Summary
 
-- Kept the local-first review workspace and public GitHub boundary intact.
-- Added a dependency-free Change Atlas with stable, explained file layers.
-- Added general, security, and test-first routes without changing
-  classification.
-- Verified classification, filtering, keyboard flow, 390 px layout, and themes.
-- Recorded later notebook, revision, integration, AI, team, and theme phases.
+- Deviations recorded: 5; the latest replaces manual releases with GitHub
+  builds.
+- Most revisitable decision: optional AI remains behind the evidence model.
+- Edge cases recorded: 16, including local deploys not creating a source link.
+- Next session should read `DEPLOYMENT.md` before changing release behavior.
+- Live proof requires a GitHub-triggered revision on the Production timeline.

@@ -13,12 +13,14 @@ does not require rebuilding old code.
 ## Current Patchscope flow
 
 ```text
-local commit -> GitHub push -> deno deploy CLI -> revision -> production timeline
+local commit -> GitHub push -> Deno GitHub integration -> revision -> timeline
 ```
 
-GitHub and production are separate steps today. A push updates the repository,
-but it does not deploy Patchscope automatically. The release command uploads the
-clean local checkout and waits for Deno's build:
+The Deno app is linked to `AhmedMohamedAbdelaty/patchscope`. Each push creates a
+revision automatically. The default branch routes successful builds to the
+Production timeline; other branches receive branch and preview URLs.
+
+The CLI remains a recovery path for deliberate manual redeployment:
 
 ```sh
 deno deploy . \
@@ -27,9 +29,8 @@ deno deploy . \
   --prod
 ```
 
-Linking the app to the repository through the Deno Deploy GitHub App would make
-pushes trigger builds automatically. Until that is enabled, the CLI gate is
-intentional: test, push, deploy, then smoke-test the exact revision.
+Normal releases do not run that command. Test, commit, and push; Deno checks out
+the GitHub commit, builds it, and routes it only after every build stage passes.
 
 ## What the build screen means
 
@@ -49,6 +50,7 @@ successfully.
 
 `deno.json` identifies the organization, app, and Fresh framework preset. The
 dashboard currently supplies the build commands and 3 GiB build-memory setting.
+The runtime uses its separate 768 MiB default memory limit.
 
 `GITHUB_TOKEN` is optional. If added, store it as a secret in the Production and
 Development contexts, never in the repository:
@@ -68,12 +70,13 @@ secret is not automatically available to the running production service.
 deno task test
 deno task check
 deno task build
+git push origin main
 curl -fsS https://patchscope.ahmedmohamedabdelaty.deno.net/health
 ```
 
 The health response exposes `DENO_DEPLOY_BUILD_ID`, so the deployed revision can
-be matched to the successful build. A failed build never receives production
-traffic.
+be matched to the GitHub-triggered build. A failed build never receives
+production traffic. Deno's build page records the source commit and trigger.
 
 Current platform references:
 
