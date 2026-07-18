@@ -73,6 +73,21 @@ The product implication is not “never use AI.” It is to add AI only after
 Patchscope can supply explicit context, cite evidence, expose uncertainty, and
 learn from dismissals without publishing anything automatically.
 
+Phase 5 follows the current provider contracts rather than adding an SDK:
+
+- [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
+  recommends schema-constrained output over JSON mode. Patchscope uses the
+  Responses API `text.format` contract with strict JSON Schema and disables
+  provider storage for every request.
+- [Ollama Structured Outputs](https://docs.ollama.com/capabilities/structured-outputs)
+  accepts a JSON Schema in `/api/chat`'s `format` field. Patchscope also parses
+  and verifies the returned content; schema compliance alone does not prove a
+  citation exists.
+- [Ollama's networking guidance](https://docs.ollama.com/faq#how-can-i-allow-additional-web-origins-to-access-ollama)
+  binds locally by default and uses `OLLAMA_ORIGINS` for browser origins. The UI
+  shows the exact current origin and never lets a review configure a remote
+  model URL.
+
 ## Decisions produced by the research
 
 1. Solve orientation first with Change Atlas.

@@ -1,5 +1,25 @@
 # Implementation notes
 
+## Phase 5 gate
+
+- Goal: make model assistance inspectable and optional without turning
+  Patchscope into an automated reviewer or secret store.
+- Unknowns checked against current official docs: OpenAI Responses supports
+  strict `text.format` schemas and request storage control; Ollama `/api/chat`
+  accepts JSON Schema and requires an allowed browser origin outside its local
+  defaults.
+- Success criteria: explicit selected-file runs; an 80 KiB context receipt;
+  fixed OpenAI and loopback Ollama endpoints; request-only keys; strict schema
+  plus exact line/side/quote validation; visible uncertainty; session-only
+  claims; private excluded conversion; and the full local, browser, security,
+  slop, push, Action, and production gates.
+- Steps: own the context and claim schema; bound the two adapters; render a
+  native evidence dialog; validate before display; connect private findings;
+  verify; push; match production.
+- Out of scope: repository-wide context, automatic runs, arbitrary model hosts,
+  stored keys, model verdicts, provider posting, claim persistence, and hidden
+  reasoning traces.
+
 ## Phase 4 gate
 
 - Goal: make Patchscope a useful read-only review operating surface across major
@@ -158,6 +178,13 @@
 - 2026-07-18: Editor links require an absolute browser-local workspace root.
   Diff paths cannot contain empty, dot, or parent segments, and every segment is
   URL-encoded before creating the documented VS Code scheme.
+- 2026-07-18: A strict JSON schema constrains response shape but does not prove
+  that cited code exists. Phase 5 resolves every side/line pair against the
+  exact sent context and requires a byte-for-byte quote match before rendering.
+- 2026-07-18: Local Ollama runs in the reviewer's browser rather than through
+  Deno Deploy. This preserves the local route, but a production-origin browser
+  may need that exact origin in `OLLAMA_ORIGINS`; Patchscope displays the
+  command boundary instead of silently falling back to a cloud proxy.
 
 ## Questions for review
 

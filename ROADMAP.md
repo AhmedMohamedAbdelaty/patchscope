@@ -29,7 +29,7 @@ contract. Offer editor deep links, a command palette, and deliberate exports to
 issue trackers and team documents without gaining provider write access by
 default.
 
-## Phase 5: Trust-calibrated AI
+## Phase 5: Trust-calibrated AI — shipped
 
 Offer opt-in BYOK and local-model adapters. AI receives explicit context and
 returns cited claims with evidence, confidence, and a reason the claim may be

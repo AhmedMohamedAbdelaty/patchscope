@@ -6,7 +6,9 @@ export const app = new App<State>();
 app.use(staticFiles());
 app.use(csp({
   useNonce: true,
-  csp: ["connect-src 'self' ws: wss:"],
+  csp: [
+    "connect-src 'self' ws: wss: http://127.0.0.1:11434",
+  ],
 }));
 app.use(
   define.middleware(async (ctx) => {

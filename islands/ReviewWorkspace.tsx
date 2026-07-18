@@ -1,5 +1,11 @@
 import { Fragment, type JSX } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { EvidenceLab } from "../components/EvidenceLab.tsx";
+import {
+  claimAnchor,
+  claimFindingBody,
+  type EvidenceClaim,
+} from "../lib/ai/evidence.ts";
 import {
   deleteReview,
   loadReview,
@@ -118,6 +124,8 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
   const [codeQuery, setCodeQuery] = useState("");
   const [theme, setTheme] = useState<Theme>("system");
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const [evidenceClaims, setEvidenceClaims] = useState<EvidenceClaim[]>([]);
   const [workspaceRoot, setWorkspaceRoot] = useState("");
   const [editorChannel, setEditorChannel] = useState<EditorChannel>("stable");
   const [notice, setNotice] = useState("");
@@ -201,6 +209,11 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
   }, [theme, viewStyle, wrap, reviewLens, workspaceRoot, editorChannel]);
 
   useEffect(() => setActiveAnchor(undefined), [selectedId]);
+
+  useEffect(() => {
+    setEvidenceClaims([]);
+    setEvidenceOpen(false);
+  }, [review?.id, selected?.id]);
 
   useEffect(() => {
     if (!review) return;
@@ -739,6 +752,26 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
           onCopySummary={copySummary}
           onCopyIssue={copyIssueDraft}
           onDownloadMemo={downloadMemo}
+          onEvidence={() => {
+            setPaletteOpen(false);
+            setEvidenceOpen(true);
+          }}
+        />
+      )}
+      {review && selected && evidenceOpen && (
+        <EvidenceLab
+          file={selected}
+          fileIndex={review.files.indexOf(selected)}
+          claims={evidenceClaims}
+          onClaims={setEvidenceClaims}
+          onConvert={(claim) =>
+            addFinding(
+              claimAnchor(selected, claim),
+              "concern",
+              claimFindingBody(claim),
+              false,
+            )}
+          onClose={() => setEvidenceOpen(false)}
         />
       )}
 
@@ -814,6 +847,8 @@ export default function ReviewWorkspace({ sampleDiff }: Props) {
                       onDownloadCapsule={downloadCapsule}
                       onImportCapsule={importCapsule}
                       onPalette={() => setPaletteOpen(true)}
+                      onEvidence={() => setEvidenceOpen(true)}
+                      evidenceClaims={evidenceClaims.length}
                       editorLink={editorLink}
                     />
                     <DiffViewer
@@ -1059,6 +1094,7 @@ function CommandPalette(props: {
   onCopySummary: () => void;
   onCopyIssue: () => void;
   onDownloadMemo: () => void;
+  onEvidence: () => void;
 }) {
   const [query, setQuery] = useState("");
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -1092,6 +1128,11 @@ function CommandPalette(props: {
       label: "Copy issue follow-up draft",
       hint: "export",
       run: props.onCopyIssue,
+    },
+    {
+      label: "Open selected-file evidence lab",
+      hint: "opt-in AI",
+      run: props.onEvidence,
     },
     {
       label: "Download team review memo",
@@ -1631,6 +1672,8 @@ function FileToolbar(props: {
   onDownloadCapsule: () => void;
   onImportCapsule: (file: File) => Promise<void>;
   onPalette: () => void;
+  onEvidence: () => void;
+  evidenceClaims: number;
   editorLink?: string;
 }) {
   const classification = classifyFile(props.file);
@@ -1734,6 +1777,13 @@ function FileToolbar(props: {
             Open in editor
           </a>
         )}
+        <button
+          class="tool-button evidence-button"
+          type="button"
+          onClick={props.onEvidence}
+        >
+          Evidence{props.evidenceClaims ? ` · ${props.evidenceClaims}` : ""}
+        </button>
         <button
           class="tool-button command-button"
           type="button"

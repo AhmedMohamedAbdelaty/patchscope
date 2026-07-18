@@ -40,14 +40,20 @@ what changed, where should I start, and what have I already checked?
 - Open an explicitly configured local workspace path in a supported editor,
   invoke core review actions from a keyboard command palette, and copy or
   download issue/document drafts without posting them.
+- Run an explicit, selected-file-only evidence check through OpenAI with a
+  transient user key or through a fixed local Ollama endpoint. Display only
+  claims whose quoted old/new line exists exactly in the sent context.
+- Dismiss a model claim or convert it into an excluded private concern. Model
+  output is session-only and is never posted, exported, or used to change review
+  state automatically.
 - Explain every priority signal; never present heuristics as a security verdict.
 - Work with keyboard, touch, reduced motion, zoom, and narrow screens.
 
 ### Excluded
 
 - Provider writes, private repositories, accounts, comments posted to a
-  provider, arbitrary forge hosts or URLs, AI review, server-side patch
-  persistence, or persistence of a revision stack across reloads.
+  provider, arbitrary forge hosts or URLs, autonomous AI review, server-side
+  patch persistence, or persistence of a revision stack across reloads.
 - Claims that a change is safe, correct, or vulnerable.
 - Claims that path-based layers represent runtime or dependency relationships.
 
@@ -96,6 +102,15 @@ what changed, where should I start, and what have I already checked?
     workspace paths leave the browser.
 21. The command palette is keyboard and touch accessible, and every export is a
     local copy/download action with an explicit destination-oriented label.
+22. AI runs only after an explicit selected-file action. The context receipt
+    excludes other files and private review state, reports truncation, and is
+    bounded to 80 KiB.
+23. OpenAI requests use a fixed Responses API endpoint, strict structured
+    output, `store: false`, and a request-only bearer key. Ollama requests use a
+    fixed loopback endpoint. Neither adapter accepts an arbitrary host.
+24. A model claim needs evidence, confidence, and a reason it may be wrong.
+    Client validation rejects missing lines, side mismatches, and inexact quotes
+    before rendering. Conversion always creates a private, excluded finding.
 
 ## Architecture decisions
 
@@ -119,11 +134,17 @@ what changed, where should I start, and what have I already checked?
   diff text with source metadata. `/api/github` remains a compatibility alias.
 - In-memory cache entries store ETag, payload, and expiry only. Patches are
   never logged or persisted by the server.
+- `/api/ai` is a narrow OpenAI BYOK relay, not a general model proxy. The
+  browser sends only a bounded selected-file context; the route fixes the
+  upstream URL and output schema and disables provider storage. Local Ollama is
+  called by the browser at `127.0.0.1:11434` so local code does not pass through
+  Patchscope's server.
 
 ## Quality budgets
 
 - Raw local input: 5 MiB maximum.
 - Provider response: 5 MiB maximum after decompression.
+- AI selected-file context: 80 KiB; model response: 256 KiB.
 - File count: 2,000 maximum; line count: 100,000 changed/context lines maximum.
 - No blocking operation should run before input is submitted.
 - The interface must remain usable at 320 CSS pixels and 200% zoom.

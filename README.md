@@ -26,9 +26,13 @@ Live at
 - Press `Ctrl+K` or `Cmd+K` inside a review for the command palette. It can move
   review state, copy an issue follow-up draft, download a team memo, and build a
   VS Code link after you provide an absolute local workspace path.
+- Open **Evidence** to run an explicit check on the selected file only. OpenAI
+  uses your request-only API key; Ollama stays on the fixed local
+  `127.0.0.1:11434` route. Patchscope rejects citations that do not exactly
+  match a sent line and never posts model output.
 - Inputs are limited to 5 MiB, 2,000 files, and 100,000 review lines.
-- Private repositories, provider writes, accounts, AI review, and server-side
-  patch storage are out of scope.
+- Private repositories, provider writes, accounts, autonomous AI review, and
+  server-side patch storage are out of scope.
 
 ## Run locally
 
@@ -95,6 +99,8 @@ and the
 
 - `lib/diff/` owns parsing, priority signals, limits, and Markdown export.
 - `lib/client/` stores review progress in IndexedDB.
+- `lib/ai/` owns selected-file context, the claim schema, and exact citation
+  validation.
 - `lib/review/` validates portable, source-free review capsules and computes
   conservative transitions between revisions.
 - `lib/server/` validates supported forge URLs, bounds provider reads, caches
